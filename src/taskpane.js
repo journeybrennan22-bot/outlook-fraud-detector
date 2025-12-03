@@ -752,27 +752,34 @@ function displayResults(warnings, scanResults, isFirstTime) {
     document.body.classList.remove('status-critical', 'status-medium', 'status-info', 'status-safe');
     
     const statusBadge = document.getElementById('status-badge');
+    const statusIcon = statusBadge?.querySelector('.status-icon');
+    const statusText = statusBadge?.querySelector('.status-text');
+    
+    if (!statusBadge || !statusIcon || !statusText) {
+        console.error('Status badge elements not found');
+        return;
+    }
     
     if (criticalCount > 0) {
         document.body.classList.add('status-critical');
         statusBadge.className = 'status-badge danger';
-        statusBadge.querySelector('.status-icon').textContent = '🚨';
-        statusBadge.querySelector('.status-text').textContent = `${criticalCount} Critical Warning${criticalCount > 1 ? 's' : ''}`;
+        statusIcon.textContent = '🚨';
+        statusText.textContent = `${criticalCount} Critical Warning${criticalCount > 1 ? 's' : ''}`;
     } else if (mediumCount > 0) {
         document.body.classList.add('status-medium');
         statusBadge.className = 'status-badge warning';
-        statusBadge.querySelector('.status-icon').textContent = '⚠️';
-        statusBadge.querySelector('.status-text').textContent = `${mediumCount} Warning${mediumCount > 1 ? 's' : ''}`;
+        statusIcon.textContent = '⚠️';
+        statusText.textContent = `${mediumCount} Warning${mediumCount > 1 ? 's' : ''}`;
     } else if (isFirstTime) {
         document.body.classList.add('status-info');
         statusBadge.className = 'status-badge info';
-        statusBadge.querySelector('.status-icon').textContent = '👤';
-        statusBadge.querySelector('.status-text').textContent = 'First-Time Sender';
+        statusIcon.textContent = '👤';
+        statusText.textContent = 'First-Time Sender';
     } else {
         document.body.classList.add('status-safe');
         statusBadge.className = 'status-badge safe';
-        statusBadge.querySelector('.status-icon').textContent = '✅';
-        statusBadge.querySelector('.status-text').textContent = 'No Issues Detected';
+        statusIcon.textContent = '✅';
+        statusText.textContent = 'No Issues Detected';
     }
     
     // Display warnings
