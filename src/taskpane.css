@@ -12,6 +12,24 @@ body {
     color: #323130;
     background: #faf9f8;
     min-height: 100vh;
+    transition: background-color 0.3s ease;
+}
+
+/* Status-based body backgrounds */
+body.status-critical {
+    background: #fde7e9;
+}
+
+body.status-medium {
+    background: #fff4ce;
+}
+
+body.status-info {
+    background: #deecf9;
+}
+
+body.status-safe {
+    background: #dff6dd;
 }
 
 #app {
@@ -27,7 +45,7 @@ body {
     align-items: center;
     gap: 12px;
     padding-bottom: 16px;
-    border-bottom: 1px solid #edebe9;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     margin-bottom: 16px;
 }
 
@@ -53,7 +71,7 @@ body {
 .spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid #edebe9;
+    border: 3px solid rgba(0, 0, 0, 0.1);
     border-top-color: #0078d4;
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -77,30 +95,36 @@ body {
     border-radius: 8px;
     margin-bottom: 16px;
     font-weight: 600;
+    font-size: 16px;
 }
 
 .status-badge.safe {
-    background: #dff6dd;
-    color: #107c10;
+    background: rgba(16, 124, 16, 0.15);
+    color: #0b5c0b;
 }
 
 .status-badge.warning {
-    background: #fff4ce;
-    color: #797673;
+    background: rgba(255, 170, 68, 0.2);
+    color: #6d5700;
+}
+
+.status-badge.info {
+    background: rgba(0, 120, 212, 0.15);
+    color: #004578;
 }
 
 .status-badge.danger {
-    background: #fde7e9;
-    color: #a80000;
+    background: rgba(168, 0, 0, 0.15);
+    color: #8b0000;
 }
 
 .status-icon {
-    font-size: 20px;
+    font-size: 24px;
 }
 
 /* Sections */
 .section {
-    background: #fff;
+    background: rgba(255, 255, 255, 0.85);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 12px;
@@ -125,90 +149,43 @@ body {
     padding: 12px;
     border-radius: 6px;
     border-left: 4px solid;
+    background: rgba(255, 255, 255, 0.9);
 }
 
 .warning-item.critical {
-    background: #fde7e9;
     border-color: #a80000;
 }
 
 .warning-item.high {
-    background: #fed9cc;
     border-color: #d83b01;
 }
 
 .warning-item.medium {
-    background: #fff4ce;
     border-color: #ffaa44;
 }
 
 .warning-item.low {
-    background: #f3f2f1;
     border-color: #8a8886;
 }
 
 .warning-title {
     font-weight: 600;
-    font-size: 13px;
+    font-size: 14px;
     margin-bottom: 4px;
+    color: #323130;
 }
 
 .warning-description {
-    font-size: 12px;
-    color: #605e5c;
+    font-size: 13px;
+    color: #323130;
 }
 
 .warning-detail {
     font-size: 11px;
-    color: #8a8886;
+    color: #605e5c;
     margin-top: 6px;
     font-family: 'Consolas', monospace;
     word-break: break-all;
-}
-
-/* Email Info */
-.info-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.info-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.info-item label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #8a8886;
-    text-transform: uppercase;
-}
-
-.info-item span {
-    font-size: 13px;
-    color: #323130;
-    word-break: break-all;
-}
-
-/* First Time Sender */
-.first-time-info {
-    padding: 12px;
-    background: #deecf9;
-    border-radius: 6px;
-    border-left: 4px solid #0078d4;
-}
-
-.first-time-info p {
-    font-size: 13px;
-    margin-bottom: 4px;
-}
-
-.first-time-info .email {
-    font-family: 'Consolas', monospace;
-    font-size: 12px;
-    color: #605e5c;
 }
 
 /* Collapsible */
@@ -236,20 +213,20 @@ body {
 .collapsible-content {
     margin-top: 12px;
     padding-top: 12px;
-    border-top: 1px solid #edebe9;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 /* Scan Results */
 #scan-results {
-    font-size: 12px;
+    font-size: 13px;
 }
 
 .scan-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 0;
-    border-bottom: 1px solid #f3f2f1;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .scan-item:last-child {
@@ -257,7 +234,8 @@ body {
 }
 
 .scan-check {
-    font-size: 14px;
+    font-size: 16px;
+    font-weight: bold;
 }
 
 .scan-pass { color: #107c10; }
@@ -304,20 +282,20 @@ body {
 }
 
 .btn-secondary {
-    background: #fff;
+    background: rgba(255, 255, 255, 0.9);
     color: #323130;
     border: 1px solid #8a8886;
 }
 
 .btn-secondary:hover {
-    background: #f3f2f1;
+    background: #fff;
 }
 
 /* Footer */
 .footer {
     margin-top: auto;
     padding-top: 16px;
-    border-top: 1px solid #edebe9;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -326,7 +304,7 @@ body {
 
 .version {
     font-size: 11px;
-    color: #8a8886;
+    color: #605e5c;
 }
 
 /* Utility */
@@ -335,12 +313,6 @@ body {
 }
 
 /* Wire Fraud Warning Special Styling */
-.warning-item.wire-fraud {
-    background: #fde7e9;
-    border-color: #a80000;
-}
-
 .warning-item.wire-fraud .warning-description {
-    color: #323130;
     font-weight: 500;
 }
