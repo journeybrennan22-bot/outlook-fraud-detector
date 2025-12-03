@@ -17,19 +17,19 @@ body {
 
 /* Status-based body backgrounds */
 body.status-critical {
-    background: #fde7e9;
+    background: #fde7e9 !important;
 }
 
 body.status-medium {
-    background: #fff4ce;
+    background: #fff4ce !important;
 }
 
 body.status-info {
-    background: #deecf9;
+    background: #deecf9 !important;
 }
 
 body.status-safe {
-    background: #dff6dd;
+    background: #dff6dd !important;
 }
 
 #app {
