@@ -1,6 +1,6 @@
 /**
- * Email Fraud Detector - Outlook Web Add-in
- * Ports the Gmail Chrome extension detection logic to Outlook
+ * Email Fraud Detector - Outlook Web Add-in (Auto-Scan Version)
+ * Automatically re-scans when you switch between emails
  */
 
 // ============================================================================
@@ -11,9 +11,9 @@ const CONFIG = {
     // Microsoft Graph API settings
     msalConfig: {
         auth: {
-            clientId: '622f0452-d622-45d1-aab3-3a2026389dd3', // Replace with your Azure AD app client ID
+            clientId: '622f0452-d622-45d1-aab3-3a2026389dd3',
             authority: 'https://login.microsoftonline.com/common',
-            redirectUri: 'https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html' // Replace with your domain
+            redirectUri: 'https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html'
         },
         cache: {
             cacheLocation: 'sessionStorage',
@@ -68,6 +68,8 @@ const CONFIG = {
 let msalInstance = null;
 let userContacts = [];
 let knownSenders = new Set();
+let contactsLoaded = false;
+let currentItemId = null;
 
 // ============================================================================
 // INITIALIZATION
@@ -94,8 +96,81 @@ async function initializeApp() {
         });
     });
     
-    // Start analysis
+    // Load contacts once at startup
+    await loadContactsOnce();
+    
+    // =========================================
+    // AUTO-SCAN: Listen for email item changes
+    // =========================================
+    try {
+        Office.context.mailbox.addHandlerAsync(
+            Office.EventType.ItemChanged,
+            onItemChanged,
+            (result) => {
+                if (result.status === Office.AsyncResultStatus.Succeeded) {
+                    console.log('ItemChanged handler registered successfully');
+                    updateAutoScanStatus(true);
+                } else {
+                    console.log('Failed to register ItemChanged handler:', result.error);
+                    updateAutoScanStatus(false);
+                }
+            }
+        );
+    } catch (e) {
+        console.log('ItemChanged event not supported:', e);
+        updateAutoScanStatus(false);
+    }
+    
+    // Initial analysis
     await analyzeEmail();
+}
+
+/**
+ * Called automatically when user switches to a different email
+ */
+function onItemChanged(eventArgs) {
+    console.log('Email changed - auto-scanning...');
+    // Small delay to ensure Office.js has updated the item reference
+    setTimeout(() => {
+        analyzeEmail();
+    }, 100);
+}
+
+/**
+ * Update the UI to show auto-scan status
+ */
+function updateAutoScanStatus(enabled) {
+    const footer = document.querySelector('.footer');
+    let statusEl = document.getElementById('auto-scan-status');
+    
+    if (!statusEl) {
+        statusEl = document.createElement('p');
+        statusEl.id = 'auto-scan-status';
+        statusEl.style.fontSize = '11px';
+        statusEl.style.marginTop = '4px';
+        footer.insertBefore(statusEl, footer.querySelector('.version'));
+    }
+    
+    if (enabled) {
+        statusEl.innerHTML = '🔄 <span style="color: #107c10;">Auto-scan ON</span> - scans as you browse';
+    } else {
+        statusEl.innerHTML = '⏸️ <span style="color: #8a8886;">Auto-scan unavailable</span>';
+    }
+}
+
+/**
+ * Load contacts only once per session
+ */
+async function loadContactsOnce() {
+    if (contactsLoaded) return;
+    
+    try {
+        await fetchUserContacts();
+        contactsLoaded = true;
+        console.log('Contacts loaded:', knownSenders.size, 'known senders');
+    } catch (e) {
+        console.log('Contact loading deferred');
+    }
 }
 
 // ============================================================================
@@ -210,7 +285,8 @@ async function getEmailData() {
             subject: item.subject || '',
             from: null,
             replyTo: null,
-            body: ''
+            body: '',
+            itemId: item.itemId
         };
         
         // Get sender info
@@ -289,7 +365,6 @@ function extractDomain(email) {
  * Extract base domain (without TLD variations)
  */
 function extractBaseDomain(domain) {
-    // Remove common TLDs for comparison
     return domain.replace(/\.(com|net|org|co|io|biz|info|xyz|online|site)$/i, '');
 }
 
@@ -297,7 +372,6 @@ function extractBaseDomain(domain) {
  * Check for Unicode/homoglyph characters
  */
 function detectHomoglyphs(text) {
-    // Common homoglyph mappings
     const homoglyphMap = {
         'а': 'a', 'е': 'e', 'і': 'i', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x',
         'ɑ': 'a', 'ḃ': 'b', 'ċ': 'c', 'ḋ': 'd', 'ė': 'e', 'ḟ': 'f', 'ġ': 'g', 'ḣ': 'h',
@@ -311,7 +385,6 @@ function detectHomoglyphs(text) {
     
     for (const char of text) {
         const code = char.charCodeAt(0);
-        // Check for Cyrillic, Greek, or other suspicious Unicode ranges
         if (homoglyphMap[char]) {
             detected.push({
                 char: char,
@@ -319,10 +392,10 @@ function detectHomoglyphs(text) {
                 code: code
             });
         } else if (
-            (code >= 0x0400 && code <= 0x04FF) || // Cyrillic
-            (code >= 0x0370 && code <= 0x03FF) || // Greek
-            (code >= 0x2100 && code <= 0x214F) || // Letterlike Symbols
-            (code >= 0xFF00 && code <= 0xFFEF)    // Halfwidth/Fullwidth
+            (code >= 0x0400 && code <= 0x04FF) ||
+            (code >= 0x0370 && code <= 0x03FF) ||
+            (code >= 0x2100 && code <= 0x214F) ||
+            (code >= 0xFF00 && code <= 0xFFEF)
         ) {
             detected.push({
                 char: char,
@@ -357,7 +430,6 @@ function detectLookalikeDomain(senderDomain) {
             });
         }
         
-        // Check for common typo patterns
         if (isTyposquatting(senderBase, trustedBase)) {
             results.push({
                 senderDomain: senderDomain,
@@ -375,25 +447,21 @@ function detectLookalikeDomain(senderDomain) {
  * Check for common typosquatting patterns
  */
 function isTyposquatting(sender, trusted) {
-    // Check for character swaps (transposition)
     for (let i = 0; i < trusted.length - 1; i++) {
         const swapped = trusted.slice(0, i) + trusted[i + 1] + trusted[i] + trusted.slice(i + 2);
         if (sender === swapped) return true;
     }
     
-    // Check for missing character
     for (let i = 0; i < trusted.length; i++) {
         const missing = trusted.slice(0, i) + trusted.slice(i + 1);
         if (sender === missing) return true;
     }
     
-    // Check for doubled character
     for (let i = 0; i < trusted.length; i++) {
         const doubled = trusted.slice(0, i + 1) + trusted[i] + trusted.slice(i + 1);
         if (sender === doubled) return true;
     }
     
-    // Check for character replacement (common typos)
     const commonReplacements = {
         'a': ['s', 'q', 'z'], 'b': ['v', 'n', 'g'], 'c': ['x', 'v', 'd'],
         'd': ['s', 'f', 'e'], 'e': ['w', 'r', 'd'], 'f': ['d', 'g', 'r'],
@@ -474,11 +542,14 @@ async function analyzeEmail() {
     showLoading();
     
     try {
-        // Fetch contacts in parallel with email data
-        const [emailData] = await Promise.all([
-            getEmailData(),
-            fetchUserContacts()
-        ]);
+        const emailData = await getEmailData();
+        
+        // Skip if same email (avoid re-scanning on every tiny event)
+        if (emailData.itemId === currentItemId) {
+            console.log('Same email, using cached results');
+            return;
+        }
+        currentItemId = emailData.itemId;
         
         const warnings = [];
         const scanResults = [];
