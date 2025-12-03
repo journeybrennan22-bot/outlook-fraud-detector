@@ -11,9 +11,9 @@ const CONFIG = {
     // Microsoft Graph API settings
     msalConfig: {
         auth: {
-            clientId: 'YOUR_APP_CLIENT_ID', // Replace with your Azure AD app client ID
+            clientId: '622f0452-d622-45d1-aab3-3a2026389dd3', // Replace with your Azure AD app client ID
             authority: 'https://login.microsoftonline.com/common',
-            redirectUri: 'https://YOUR_DOMAIN/src/taskpane.html' // Replace with your domain
+            redirectUri: 'https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html' // Replace with your domain
         },
         cache: {
             cacheLocation: 'sessionStorage',
