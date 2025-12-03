@@ -1,0 +1,24 @@
+{
+  "name": "outlook-email-fraud-detector",
+  "version": "1.0.0",
+  "description": "Outlook Web Add-in to detect email fraud including lookalike domains, wire fraud keywords, and impersonation attempts",
+  "author": "Journey Insurance",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "dev": "npx office-addin-debugging start manifest.xml",
+    "start": "npx http-server -p 3000 --cors -c-1",
+    "validate": "npx office-addin-manifest validate manifest.xml",
+    "build": "echo 'Static files - no build needed'",
+    "sideload": "npx office-addin-dev-certs install && npx office-addin-debugging start manifest.xml"
+  },
+  "devDependencies": {
+    "office-addin-debugging": "^5.0.0",
+    "office-addin-dev-certs": "^1.11.0",
+    "office-addin-manifest": "^1.12.0",
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
