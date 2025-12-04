@@ -15,6 +15,12 @@
 </head>
 <body>
     <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-icon">🛡️</div>
+            <h1>Email Fraud Detector</h1>
+        </header>
+
         <!-- Loading State -->
         <div id="loading" class="loading">
             <div class="spinner"></div>
@@ -31,11 +37,12 @@
 
             <!-- Warnings Section -->
             <div id="warnings-section" class="section hidden">
+                <h2>⚠️ Warnings Detected</h2>
                 <div id="warnings-list" class="warnings-list"></div>
             </div>
 
-            <!-- Scan Details - Collapsed by default -->
-            <div id="scan-details" class="section collapsible collapsed">
+            <!-- Scan Details -->
+            <div id="scan-details" class="section collapsible">
                 <h2 class="collapsible-header">
                     🔍 Scan Details
                     <span class="collapse-icon">▼</span>
@@ -56,7 +63,7 @@
         <!-- Footer -->
         <footer class="footer">
             <button id="rescan-btn" class="btn btn-secondary">Re-scan Email</button>
-            <p class="version">v1.2.0</p>
+            <p class="version">v1.1.0</p>
         </footer>
     </div>
 
