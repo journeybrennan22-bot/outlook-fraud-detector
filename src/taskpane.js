@@ -613,7 +613,9 @@ async function analyzeEmail() {
                     severity: 'medium',
                     title: 'Reply-To Mismatch',
                     description: 'Replies will go to a different address than the sender.',
-                    detail: `From: ${senderEmail}\nReply-To: ${replyToEmail}`
+                    senderEmail: senderEmail,
+                    matchedEmail: replyToEmail,
+                    matchedLabel: 'Replies go to'
                 });
                 scanResults.push({ check: 'Reply-To Match', status: 'fail' });
             } else {
@@ -693,7 +695,8 @@ async function analyzeEmail() {
                 severity: 'critical',
                 title: 'Similar to Known Contact',
                 description: `This email address is suspiciously similar to someone in your contacts. ${contactLookalike.reason}.`,
-                detail: `Sender: ${contactLookalike.incomingEmail}\nSimilar to: ${contactLookalike.matchedContact}`
+                senderEmail: contactLookalike.incomingEmail,
+                matchedEmail: contactLookalike.matchedContact
             });
             scanResults.push({ check: 'Contact Match', status: 'fail' });
         } else {
@@ -788,13 +791,35 @@ function displayResults(warnings, scanResults, isFirstTime) {
     
     if (warnings.length > 0) {
         warningsSection.classList.remove('hidden');
-        warningsList.innerHTML = warnings.map(w => `
-            <div class="warning-item ${w.severity}${w.isWireFraud ? ' wire-fraud' : ''}">
-                <div class="warning-title">${w.title}</div>
-                <div class="warning-description">${w.description}</div>
-                ${w.detail ? `<div class="warning-detail">${w.detail}</div>` : ''}
-            </div>
-        `).join('');
+        warningsList.innerHTML = warnings.map(w => {
+            // Format email-related warnings with prominent email display
+            let emailHtml = '';
+            if (w.senderEmail && w.matchedEmail) {
+                const matchLabel = w.matchedLabel || 'Similar to';
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Sender:</span>
+                            <span class="warning-email-value">${w.senderEmail}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">${matchLabel}:</span>
+                            <span class="warning-email-value">${w.matchedEmail}</span>
+                        </div>
+                    </div>
+                `;
+            } else if (w.detail && !w.isWireFraud) {
+                emailHtml = `<div class="warning-detail">${w.detail}</div>`;
+            }
+            
+            return `
+                <div class="warning-item ${w.severity}${w.isWireFraud ? ' wire-fraud' : ''}">
+                    <div class="warning-title">${w.title}</div>
+                    <div class="warning-description">${w.description}</div>
+                    ${emailHtml}
+                </div>
+            `;
+        }).join('');
     } else {
         warningsSection.classList.add('hidden');
     }
