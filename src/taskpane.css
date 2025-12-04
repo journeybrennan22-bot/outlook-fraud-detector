@@ -17,7 +17,7 @@ body {
 
 /* Status-based body backgrounds */
 body.status-critical {
-    background: #f8c8cc !important;
+    background: #f5a3aa !important;
 }
 
 body.status-medium {
