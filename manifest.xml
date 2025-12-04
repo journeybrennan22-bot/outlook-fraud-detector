@@ -1,104 +1,129 @@
-This XML file does not appear to have any style information associated with it. The document tree is shown below.
-<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
-<Id>622f0452-d622-45d1-aab3-3a2026389dd3</Id>
-<Version>1.1.0.0</Version>
-<ProviderName>Journey Insurance</ProviderName>
-<DefaultLocale>en-US</DefaultLocale>
-<DisplayName DefaultValue="Email Fraud Detector"/>
-<Description DefaultValue="Detects email fraud including lookalike domains, wire fraud keywords, and impersonation attempts. Auto-scans as you browse emails."/>
-<IconUrl DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-64.png"/>
-<HighResolutionIconUrl DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-128.png"/>
-<SupportUrl DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/"/>
-<AppDomains>
-<AppDomain>https://graph.microsoft.com</AppDomain>
-</AppDomains>
-<Hosts>
-<Host Name="Mailbox"/>
-</Hosts>
-<Requirements>
-<Sets>
-<Set Name="Mailbox" MinVersion="1.5"/>
-</Sets>
-</Requirements>
-<FormSettings>
-<Form xsi:type="ItemRead">
-<DesktopSettings>
-<SourceLocation DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html"/>
-<RequestedHeight>450</RequestedHeight>
-</DesktopSettings>
-</Form>
-</FormSettings>
-<Permissions>ReadItem</Permissions>
-<Rule xsi:type="RuleCollection" Mode="Or">
-<Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
-</Rule>
-<DisableEntityHighlighting>false</DisableEntityHighlighting>
-<VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
-<VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
-<Requirements>
-<bt:Sets DefaultMinVersion="1.5">
-<bt:Set Name="Mailbox"/>
-</bt:Sets>
-</Requirements>
-<Hosts>
-<Host xsi:type="MailHost">
-<DesktopFormFactor>
-<!--  Extension point for message read  -->
-<ExtensionPoint xsi:type="MessageReadCommandSurface">
-<OfficeTab id="TabDefault">
-<Group id="msgReadGroup">
-<Label resid="groupLabel"/>
-<!--  Main taskpane button with PINNING support  -->
-<Control xsi:type="Button" id="taskpaneButton">
-<Label resid="taskpaneButtonLabel"/>
-<Supertip>
-<Title resid="taskpaneButtonLabel"/>
-<Description resid="taskpaneButtonDescLong"/>
-</Supertip>
-<Icon>
-<bt:Image size="16" resid="icon16"/>
-<bt:Image size="32" resid="icon32"/>
-<bt:Image size="80" resid="icon80"/>
-</Icon>
-<Action xsi:type="ShowTaskpane">
-<SourceLocation resid="taskpaneUrl"/>
-<!--  Enable pinning so it stays open  -->
-<SupportsPinning>true</SupportsPinning>
-</Action>
-</Control>
-</Group>
-</OfficeTab>
-</ExtensionPoint>
-</DesktopFormFactor>
-</Host>
-</Hosts>
-<Resources>
-<bt:Images>
-<bt:Image id="icon16" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-16.png"/>
-<bt:Image id="icon32" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-32.png"/>
-<bt:Image id="icon64" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-64.png"/>
-<bt:Image id="icon80" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-80.png"/>
-<bt:Image id="icon128" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-128.png"/>
-</bt:Images>
-<bt:Urls>
-<bt:Url id="taskpaneUrl" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html"/>
-</bt:Urls>
-<bt:ShortStrings>
-<bt:String id="groupLabel" DefaultValue="Email Security"/>
-<bt:String id="taskpaneButtonLabel" DefaultValue="Fraud Detector"/>
-</bt:ShortStrings>
-<bt:LongStrings>
-<bt:String id="taskpaneButtonDescLong" DefaultValue="Scans emails for fraud indicators. Pin this panel to auto-scan as you browse emails."/>
-</bt:LongStrings>
-</Resources>
-<WebApplicationInfo>
-<Id>622f0452-d622-45d1-aab3-3a2026389dd3</Id>
-<Resource>api://journeybrennan22-bot.github.io/outlook-fraud-detector/622f0452-d622-45d1-aab3-3a2026389dd3</Resource>
-<Scopes>
-<Scope>Contacts.Read</Scope>
-<Scope>User.Read</Scope>
-</Scopes>
-</WebApplicationInfo>
-</VersionOverrides>
-</VersionOverrides>
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+           xsi:type="MailApp">
+  
+  <Id>a1b2c3d4-e5f6-7890-abcd-ef1234567890</Id>
+  <Version>1.2.0.0</Version>
+  <ProviderName>Journey Insurance</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Email Fraud Detector"/>
+  <Description DefaultValue="Detects email fraud including lookalike domains, wire fraud keywords, and impersonation attempts."/>
+  
+  <IconUrl DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-128.png"/>
+  <SupportUrl DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/"/>
+  
+  <AppDomains>
+    <AppDomain>https://graph.microsoft.com</AppDomain>
+    <AppDomain>https://login.microsoftonline.com</AppDomain>
+  </AppDomains>
+  
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+  
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.1"/>
+    </Sets>
+  </Requirements>
+  
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html"/>
+        <RequestedHeight>450</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+  
+  <Permissions>ReadItem</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+  </Rule>
+  
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.5">
+          <bt:Set Name="Mailbox"/>
+        </bt:Sets>
+      </Requirements>
+      
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+            
+            <FunctionFile resid="functionFile"/>
+            
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="msgReadGroup">
+                  <Label resid="groupLabel"/>
+                  
+                  <Control xsi:type="Button" id="taskpaneButton">
+                    <Label resid="taskpaneButtonLabel"/>
+                    <Supertip>
+                      <Title resid="taskpaneButtonLabel"/>
+                      <Description resid="taskpaneButtonDesc"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="icon16"/>
+                      <bt:Image size="32" resid="icon32"/>
+                      <bt:Image size="80" resid="icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="taskpaneUrl"/>
+                      <SupportsPinning>true</SupportsPinning>
+                    </Action>
+                  </Control>
+                  
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+            
+          </DesktopFormFactor>
+        </Host>
+      </Hosts>
+      
+      <Resources>
+        <bt:Images>
+          <bt:Image id="icon16" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-16.png"/>
+          <bt:Image id="icon32" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-32.png"/>
+          <bt:Image id="icon64" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-64.png"/>
+          <bt:Image id="icon80" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-80.png"/>
+          <bt:Image id="icon128" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-128.png"/>
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="taskpaneUrl" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html"/>
+          <bt:Url id="functionFile" DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/functions.html"/>
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="groupLabel" DefaultValue="Email Security"/>
+          <bt:String id="taskpaneButtonLabel" DefaultValue="Fraud Detector"/>
+          <bt:String id="taskpaneButtonDesc" DefaultValue="Scan this email for fraud indicators"/>
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="taskpaneButtonDescLong" DefaultValue="Analyzes the current email for signs of fraud including lookalike domains, impersonation, and wire fraud keywords."/>
+        </bt:LongStrings>
+      </Resources>
+      
+      <WebApplicationInfo>
+        <Id>622f0452-d622-45d1-aab3-3a2026389dd3</Id>
+        <Resource>api://journeybrennan22-bot.github.io/outlook-fraud-detector/622f0452-d622-45d1-aab3-3a2026389dd3</Resource>
+        <Scopes>
+          <Scope>Contacts.Read</Scope>
+          <Scope>User.Read</Scope>
+        </Scopes>
+      </WebApplicationInfo>
+      
+    </VersionOverrides>
+  </VersionOverrides>
+  
 </OfficeApp>
