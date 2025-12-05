@@ -24,11 +24,11 @@ body.status-medium {
 }
 
 body.status-info {
-    background: #64b5f6 !important;
+    background: #2196f3 !important;
 }
 
 body.status-safe {
-    background: #66bb6a !important;
+    background: #4caf50 !important;
 }
 
 #app {
