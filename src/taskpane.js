@@ -1,509 +1,346 @@
-/**
- * Email Fraud Detector - Outlook Web Add-in (Auto-Scan Version)
- * Automatically re-scans when you switch between emails
- */
+// Email Fraud Detector - Outlook Web Add-in
+// Version 2.0.0
 
-// ============================================================================
+// ============================================
 // CONFIGURATION
-// ============================================================================
-
+// ============================================
 const CONFIG = {
-    // Microsoft Graph API settings
-    msalConfig: {
+    clientId: '622f0452-d622-45d1-aab3-3a2026389dd3',
+    redirectUri: 'https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html',
+    scopes: ['User.Read', 'Contacts.Read'],
+    trustedDomains: ['baynac.com', 'purelogicescrow.com', 'journeyinsurance.com']
+};
+
+// Wire fraud keywords
+const WIRE_FRAUD_KEYWORDS = [
+    'wire transfer', 'wire instructions', 'wiring instructions',
+    'bank account', 'account number', 'routing number',
+    'aba number', 'swift code', 'iban',
+    'updated wire', 'new wire', 'changed wire',
+    'updated bank', 'new bank', 'changed bank',
+    'send funds', 'transfer funds', 'remit funds',
+    'urgent wire', 'immediate wire', 'same day wire',
+    'closing funds', 'earnest money', 'escrow funds'
+];
+
+// Homoglyph characters
+const HOMOGLYPHS = {
+    'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'х': 'x',
+    'і': 'i', 'ј': 'j', 'ѕ': 's', 'ԁ': 'd', 'ɡ': 'g', 'ո': 'n',
+    'ν': 'v', 'ѡ': 'w', 'у': 'y', 'һ': 'h', 'ⅼ': 'l', 'ｍ': 'm',
+    '0': 'o', '1': 'l', '！': '!', '＠': '@'
+};
+
+// ============================================
+// STATE
+// ============================================
+let msalInstance = null;
+let knownSenders = new Set();
+let currentItemId = null;
+let isAutoScanEnabled = true;
+
+// ============================================
+// INITIALIZATION
+// ============================================
+Office.onReady((info) => {
+    if (info.host === Office.HostType.Outlook) {
+        initializeMsal();
+        setupEventHandlers();
+        analyzeCurrentEmail();
+        setupAutoScan();
+    }
+});
+
+function initializeMsal() {
+    const msalConfig = {
         auth: {
-            clientId: '622f0452-d622-45d1-aab3-3a2026389dd3',
-            authority: 'https://login.microsoftonline.com/common',
-            redirectUri: 'https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html'
+            clientId: CONFIG.clientId,
+            redirectUri: CONFIG.redirectUri,
+            authority: 'https://login.microsoftonline.com/common'
         },
         cache: {
             cacheLocation: 'sessionStorage',
             storeAuthStateInCookie: false
         }
-    },
-    graphScopes: ['Contacts.Read', 'User.Read'],
-    
-    // Trusted domains for your organization
-    trustedDomains: [
-        'baynac.com',
-        'purelogicescrow.com',
-        'journeyinsurance.com',
-        // Add more trusted domains
-    ],
-    
-    // Company keywords to watch for in display names (impersonation detection)
-    trustedCompanyKeywords: [
-        'microsoft', 'office', 'outlook', 'azure',
-        'google', 'gmail', 'apple', 'icloud',
-        'amazon', 'aws', 'paypal', 'venmo',
-        'chase', 'bank of america', 'wells fargo', 'citi',
-        'fidelity', 'schwab', 'vanguard',
-        'fedex', 'ups', 'usps',
-        'irs', 'social security',
-        'pure logic', 'purelogic', 'journey insurance',
-        // Add your company names and trusted business partners
-    ],
-    
-    // Wire fraud keywords
-    wireKeywords: [
-        'wire transfer', 'wire instructions', 'wiring instructions',
-        'bank transfer', 'routing number', 'account number',
-        'ach transfer', 'swift code', 'iban',
-        'updated bank', 'new bank', 'changed bank',
-        'payment instructions', 'fund transfer',
-        'escrow', 'closing', 'settlement',
-        'urgent payment', 'immediate transfer'
-    ],
-    
-    // Levenshtein threshold for lookalike detection
-    lookalikeSimilarityThreshold: 0.85,
-    
-    // Common lookalike domain patterns
-    commonLookalikeTLDs: ['.co', '.net', '.org', '.info', '.biz', '.xyz', '.online', '.site']
-};
+    };
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+}
 
-// ============================================================================
-// STATE
-// ============================================================================
+function setupEventHandlers() {
+    document.getElementById('rescan-btn').addEventListener('click', analyzeCurrentEmail);
+    document.getElementById('retry-btn').addEventListener('click', analyzeCurrentEmail);
+}
 
-let msalInstance = null;
-let userContacts = [];
-let knownSenders = new Set();
-let contactsLoaded = false;
-let currentItemId = null;
-
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
-
-Office.onReady((info) => {
-    if (info.host === Office.HostType.Outlook) {
-        initializeApp();
-    }
-});
-
-async function initializeApp() {
-    // Initialize MSAL
-    msalInstance = new msal.PublicClientApplication(CONFIG.msalConfig);
-    
-    // Set up event listeners
-    document.getElementById('retry-btn')?.addEventListener('click', analyzeEmail);
-    document.getElementById('rescan-btn')?.addEventListener('click', analyzeEmail);
-    
-    // Set up collapsible sections
-    document.querySelectorAll('.collapsible-header').forEach(header => {
-        header.addEventListener('click', () => {
-            header.closest('.collapsible').classList.toggle('collapsed');
-        });
-    });
-    
-    // Load contacts once at startup
-    await loadContactsOnce();
-    
-    // =========================================
-    // AUTO-SCAN: Listen for email item changes
-    // =========================================
-    try {
+function setupAutoScan() {
+    if (Office.context.mailbox.addHandlerAsync) {
         Office.context.mailbox.addHandlerAsync(
             Office.EventType.ItemChanged,
             onItemChanged,
             (result) => {
                 if (result.status === Office.AsyncResultStatus.Succeeded) {
-                    console.log('ItemChanged handler registered successfully');
-                    updateAutoScanStatus(true);
-                } else {
-                    console.log('Failed to register ItemChanged handler:', result.error);
-                    updateAutoScanStatus(false);
+                    console.log('Auto-scan enabled');
                 }
             }
         );
-    } catch (e) {
-        console.log('ItemChanged event not supported:', e);
-        updateAutoScanStatus(false);
-    }
-    
-    // Initial analysis
-    await analyzeEmail();
-}
-
-/**
- * Called automatically when user switches to a different email
- */
-function onItemChanged(eventArgs) {
-    console.log('Email changed - auto-scanning...');
-    // Small delay to ensure Office.js has updated the item reference
-    setTimeout(() => {
-        analyzeEmail();
-    }, 100);
-}
-
-/**
- * Update the UI to show auto-scan status
- */
-function updateAutoScanStatus(enabled) {
-    const footer = document.querySelector('.footer');
-    let statusEl = document.getElementById('auto-scan-status');
-    
-    if (!statusEl) {
-        statusEl = document.createElement('p');
-        statusEl.id = 'auto-scan-status';
-        statusEl.style.fontSize = '11px';
-        statusEl.style.marginTop = '4px';
-        footer.insertBefore(statusEl, footer.querySelector('.version'));
-    }
-    
-    if (enabled) {
-        statusEl.innerHTML = '🔄 <span style="color: #107c10;">Auto-scan ON</span> - scans as you browse';
-    } else {
-        statusEl.innerHTML = '⏸️ <span style="color: #8a8886;">Auto-scan unavailable</span>';
     }
 }
 
-/**
- * Load contacts only once per session
- */
-async function loadContactsOnce() {
-    if (contactsLoaded) return;
-    
-    try {
-        await fetchUserContacts();
-        contactsLoaded = true;
-        console.log('Contacts loaded:', knownSenders.size, 'known senders');
-    } catch (e) {
-        console.log('Contact loading deferred');
+function onItemChanged() {
+    if (isAutoScanEnabled) {
+        analyzeCurrentEmail();
     }
 }
 
-// ============================================================================
-// MICROSOFT GRAPH API - CONTACTS
-// ============================================================================
+function toggleScanDetails() {
+    const content = document.getElementById('scan-results');
+    const icon = document.getElementById('collapse-icon');
+    content.classList.toggle('collapsed');
+    icon.classList.toggle('collapsed');
+}
 
+// ============================================
+// AUTHENTICATION & CONTACTS
+// ============================================
 async function getAccessToken() {
+    if (!msalInstance) return null;
+    
+    const accounts = msalInstance.getAllAccounts();
+    
     try {
-        // Try silent token acquisition first
-        const accounts = msalInstance.getAllAccounts();
         if (accounts.length > 0) {
             const response = await msalInstance.acquireTokenSilent({
-                scopes: CONFIG.graphScopes,
+                scopes: CONFIG.scopes,
                 account: accounts[0]
             });
             return response.accessToken;
+        } else {
+            const response = await msalInstance.acquireTokenPopup({
+                scopes: CONFIG.scopes
+            });
+            return response.accessToken;
         }
-        
-        // Fall back to popup
-        const response = await msalInstance.acquireTokenPopup({
-            scopes: CONFIG.graphScopes
-        });
-        return response.accessToken;
     } catch (error) {
-        console.error('Token acquisition failed:', error);
+        console.log('Auth error:', error);
         return null;
     }
 }
 
-async function fetchUserContacts() {
+async function fetchContacts() {
+    const token = await getAccessToken();
+    if (!token) return;
+    
     try {
-        const token = await getAccessToken();
-        if (!token) {
-            console.log('No token available, skipping contact sync');
-            return [];
-        }
-        
-        const response = await fetch('https://graph.microsoft.com/v1.0/me/contacts?$select=emailAddresses,displayName&$top=1000', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Graph API error: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        const contacts = [];
-        
-        data.value.forEach(contact => {
-            if (contact.emailAddresses) {
-                contact.emailAddresses.forEach(email => {
-                    contacts.push({
-                        email: email.address.toLowerCase(),
-                        name: contact.displayName || ''
-                    });
-                    knownSenders.add(email.address.toLowerCase());
-                });
-            }
-        });
-        
-        // Also fetch from people API for recent contacts
-        await fetchRecentPeople(token);
-        
-        return contacts;
-    } catch (error) {
-        console.error('Failed to fetch contacts:', error);
-        return [];
-    }
-}
-
-async function fetchRecentPeople(token) {
-    try {
-        const response = await fetch('https://graph.microsoft.com/v1.0/me/people?$top=100', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+        const response = await fetch('https://graph.microsoft.com/v1.0/me/contacts?$top=500&$select=emailAddresses', {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (response.ok) {
             const data = await response.json();
-            data.value.forEach(person => {
-                if (person.scoredEmailAddresses) {
-                    person.scoredEmailAddresses.forEach(email => {
-                        knownSenders.add(email.address.toLowerCase());
+            data.value.forEach(contact => {
+                if (contact.emailAddresses) {
+                    contact.emailAddresses.forEach(email => {
+                        if (email.address) {
+                            knownSenders.add(email.address.toLowerCase());
+                        }
                     });
                 }
             });
         }
     } catch (error) {
-        console.log('People API not available:', error);
+        console.log('Contacts fetch error:', error);
     }
 }
 
-// ============================================================================
-// EMAIL DATA EXTRACTION
-// ============================================================================
-
-async function getEmailData() {
-    return new Promise((resolve, reject) => {
+// ============================================
+// MAIN ANALYSIS
+// ============================================
+async function analyzeCurrentEmail() {
+    showLoading();
+    
+    try {
+        // Fetch contacts if not already loaded
+        if (knownSenders.size === 0) {
+            await fetchContacts();
+        }
+        
+        // Get email data
         const item = Office.context.mailbox.item;
         
-        if (!item) {
-            reject(new Error('No email item available'));
-            return;
-        }
-        
-        const emailData = {
-            subject: item.subject || '',
-            from: null,
-            replyTo: null,
-            body: '',
-            itemId: item.itemId
-        };
-        
-        // Get sender info
-        if (item.from) {
-            emailData.from = {
-                displayName: item.from.displayName || '',
-                emailAddress: item.from.emailAddress || ''
-            };
-        }
-        
-        // Get reply-to (if different from sender)
-        if (item.replyTo && item.replyTo.length > 0) {
-            emailData.replyTo = {
-                displayName: item.replyTo[0].displayName || '',
-                emailAddress: item.replyTo[0].emailAddress || ''
-            };
-        }
-        
-        // Get email body
-        item.body.getAsync(Office.CoercionType.Text, (result) => {
+        item.from.getAsync((result) => {
             if (result.status === Office.AsyncResultStatus.Succeeded) {
-                emailData.body = result.value;
-            }
-            resolve(emailData);
-        });
-    });
-}
-
-// ============================================================================
-// DETECTION LOGIC (Ported from Gmail Extension)
-// ============================================================================
-
-/**
- * Calculate Levenshtein distance between two strings
- */
-function levenshteinDistance(str1, str2) {
-    const m = str1.length;
-    const n = str2.length;
-    const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
-    
-    for (let i = 0; i <= m; i++) dp[i][0] = i;
-    for (let j = 0; j <= n; j++) dp[0][j] = j;
-    
-    for (let i = 1; i <= m; i++) {
-        for (let j = 1; j <= n; j++) {
-            if (str1[i - 1] === str2[j - 1]) {
-                dp[i][j] = dp[i - 1][j - 1];
+                const from = result.value;
+                
+                // Get subject and body
+                item.subject.getAsync((subjectResult) => {
+                    item.body.getAsync(Office.CoercionType.Text, (bodyResult) => {
+                        // Get reply-to if available
+                        let replyTo = null;
+                        if (item.getItemIdAsync) {
+                            // Check for reply-to in internet headers if available
+                        }
+                        
+                        const emailData = {
+                            from: from,
+                            subject: subjectResult.status === Office.AsyncResultStatus.Succeeded ? subjectResult.value : '',
+                            body: bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '',
+                            replyTo: replyTo
+                        };
+                        
+                        performAnalysis(emailData);
+                    });
+                });
             } else {
-                dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+                showError('Could not read email data');
             }
-        }
+        });
+    } catch (error) {
+        showError(error.message);
     }
-    
-    return dp[m][n];
 }
 
-/**
- * Calculate similarity ratio between two strings
- */
-function calculateSimilarity(str1, str2) {
-    const distance = levenshteinDistance(str1.toLowerCase(), str2.toLowerCase());
-    const maxLen = Math.max(str1.length, str2.length);
-    return maxLen === 0 ? 1 : 1 - (distance / maxLen);
-}
-
-/**
- * Extract domain from email address
- */
-function extractDomain(email) {
-    if (!email) return '';
-    const parts = email.toLowerCase().split('@');
-    return parts.length > 1 ? parts[1] : '';
-}
-
-/**
- * Extract base domain (without TLD variations)
- */
-function extractBaseDomain(domain) {
-    return domain.replace(/\.(com|net|org|co|io|biz|info|xyz|online|site)$/i, '');
-}
-
-/**
- * Check for Unicode/homoglyph characters
- */
-function detectHomoglyphs(text) {
-    const homoglyphMap = {
-        'а': 'a', 'е': 'e', 'і': 'i', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x',
-        'ɑ': 'a', 'ḃ': 'b', 'ċ': 'c', 'ḋ': 'd', 'ė': 'e', 'ḟ': 'f', 'ġ': 'g', 'ḣ': 'h',
-        'і': 'i', 'ј': 'j', 'κ': 'k', 'ḷ': 'l', 'ṁ': 'm', 'ṅ': 'n', 'ο': 'o', 'ρ': 'p',
-        'ԛ': 'q', 'ṙ': 'r', 'ṡ': 's', 'ṫ': 't', 'υ': 'u', 'ν': 'v', 'ẃ': 'w', 'х': 'x',
-        'ỳ': 'y', 'ż': 'z', '0': 'o', '1': 'l', 'ⅰ': 'i', 'ⅼ': 'l', 'ℓ': 'l',
-        'ɡ': 'g', 'ɩ': 'i', 'ɪ': 'i', 'ʝ': 'j', 'ĸ': 'k', 'ŀ': 'l', 'ɴ': 'n', 'ɵ': 'o'
-    };
+function performAnalysis(emailData) {
+    const warnings = [];
+    const scanResults = [];
     
-    const detected = [];
+    const senderEmail = emailData.from.emailAddress.toLowerCase();
+    const senderDomain = senderEmail.split('@')[1] || '';
+    const displayName = emailData.from.displayName || '';
+    const subject = emailData.subject || '';
+    const body = emailData.body || '';
+    const fullContent = (subject + ' ' + body).toLowerCase();
     
-    for (const char of text) {
-        const code = char.charCodeAt(0);
-        if (homoglyphMap[char]) {
-            detected.push({
-                char: char,
-                looksLike: homoglyphMap[char],
-                code: code
-            });
-        } else if (
-            (code >= 0x0400 && code <= 0x04FF) ||
-            (code >= 0x0370 && code <= 0x03FF) ||
-            (code >= 0x2100 && code <= 0x214F) ||
-            (code >= 0xFF00 && code <= 0xFFEF)
-        ) {
-            detected.push({
-                char: char,
-                looksLike: '?',
-                code: code
-            });
-        }
+    // 1. Reply-To Mismatch (MEDIUM)
+    if (emailData.replyTo && emailData.replyTo.toLowerCase() !== senderEmail) {
+        warnings.push({
+            type: 'replyto-mismatch',
+            severity: 'medium',
+            title: 'Reply-To Mismatch',
+            description: 'Replies will go to a different address than the sender.',
+            senderEmail: senderEmail,
+            matchedEmail: emailData.replyTo.toLowerCase()
+        });
+        scanResults.push({ check: 'Reply-To Match', status: 'fail' });
+    } else {
+        scanResults.push({ check: 'Reply-To Match', status: 'pass' });
     }
     
-    return detected;
+    // 2. Display Name Impersonation (CRITICAL)
+    const impersonation = detectDisplayNameImpersonation(displayName, senderDomain);
+    if (impersonation) {
+        warnings.push({
+            type: 'impersonation',
+            severity: 'critical',
+            title: 'Display Name Impersonation',
+            description: impersonation.reason,
+            senderEmail: senderEmail,
+            matchedEmail: impersonation.impersonatedDomain
+        });
+        scanResults.push({ check: 'Display Name Check', status: 'fail' });
+    } else {
+        scanResults.push({ check: 'Display Name Check', status: 'pass' });
+    }
+    
+    // 3. Homoglyph/Unicode Detection (CRITICAL)
+    const homoglyph = detectHomoglyphs(senderEmail);
+    if (homoglyph) {
+        warnings.push({
+            type: 'homoglyph',
+            severity: 'critical',
+            title: 'Suspicious Characters Detected',
+            description: `The email address contains deceptive characters that look like normal letters.`,
+            detail: homoglyph
+        });
+        scanResults.push({ check: 'Character Analysis', status: 'fail' });
+    } else {
+        scanResults.push({ check: 'Character Analysis', status: 'pass' });
+    }
+    
+    // 4. Lookalike Domain Detection (CRITICAL)
+    const lookalike = detectLookalikeDomain(senderDomain);
+    if (lookalike) {
+        warnings.push({
+            type: 'lookalike-domain',
+            severity: 'critical',
+            title: 'Lookalike Domain',
+            description: `This domain is similar to ${lookalike.trustedDomain}`,
+            senderEmail: senderEmail,
+            matchedEmail: lookalike.trustedDomain
+        });
+        scanResults.push({ check: 'Domain Similarity', status: 'fail' });
+    } else {
+        scanResults.push({ check: 'Domain Similarity', status: 'pass' });
+    }
+    
+    // 5. Wire Fraud Keywords (CRITICAL)
+    const wireKeywords = detectWireFraudKeywords(fullContent);
+    if (wireKeywords.length > 0) {
+        warnings.push({
+            type: 'wire-fraud',
+            severity: 'critical',
+            title: 'Wire Fraud Keywords Detected',
+            description: `This email contains terms commonly used in wire fraud: "${wireKeywords.slice(0, 3).join('", "')}"${wireKeywords.length > 3 ? '...' : ''}`,
+            isWireFraud: true
+        });
+        scanResults.push({ check: 'Wire Fraud Keywords', status: 'fail' });
+    } else {
+        scanResults.push({ check: 'Wire Fraud Keywords', status: 'pass' });
+    }
+    
+    // 6. Contact Lookalike Detection (CRITICAL)
+    const contactLookalike = detectContactLookalike(senderEmail);
+    if (contactLookalike) {
+        warnings.push({
+            type: 'contact-lookalike',
+            severity: 'critical',
+            title: 'Similar to Known Contact',
+            description: `This email is suspiciously similar to someone in your contacts. ${contactLookalike.reason}`,
+            senderEmail: contactLookalike.incomingEmail,
+            matchedEmail: contactLookalike.matchedContact
+        });
+        scanResults.push({ check: 'Contact Match', status: 'fail' });
+    } else {
+        scanResults.push({ check: 'Contact Match', status: 'pass' });
+    }
+    
+    // 7. First-Time Sender Check
+    const isFirstTime = !knownSenders.has(senderEmail) && !isTrustedDomain(senderDomain);
+    if (isFirstTime) {
+        scanResults.push({ check: 'Known Sender', status: 'info', note: 'First-time sender' });
+    } else {
+        scanResults.push({ check: 'Known Sender', status: 'pass' });
+    }
+    
+    displayResults(warnings, scanResults, isFirstTime);
 }
 
-/**
- * Check for lookalike domain
- */
-function detectLookalikeDomain(senderDomain) {
-    const results = [];
-    const senderBase = extractBaseDomain(senderDomain);
-    
-    for (const trustedDomain of CONFIG.trustedDomains) {
-        const trustedBase = extractBaseDomain(trustedDomain);
-        
-        if (senderDomain === trustedDomain) continue;
-        
-        const similarity = calculateSimilarity(senderBase, trustedBase);
-        
-        if (similarity >= CONFIG.lookalikeSimilarityThreshold && similarity < 1) {
-            results.push({
-                senderDomain: senderDomain,
-                trustedDomain: trustedDomain,
-                similarity: Math.round(similarity * 100)
-            });
-        }
-        
-        if (isTyposquatting(senderBase, trustedBase)) {
-            results.push({
-                senderDomain: senderDomain,
-                trustedDomain: trustedDomain,
-                similarity: 90,
-                type: 'typosquatting'
-            });
-        }
-    }
-    
-    return results;
-}
-
-/**
- * Check for common typosquatting patterns
- */
-function isTyposquatting(sender, trusted) {
-    for (let i = 0; i < trusted.length - 1; i++) {
-        const swapped = trusted.slice(0, i) + trusted[i + 1] + trusted[i] + trusted.slice(i + 2);
-        if (sender === swapped) return true;
-    }
-    
-    for (let i = 0; i < trusted.length; i++) {
-        const missing = trusted.slice(0, i) + trusted.slice(i + 1);
-        if (sender === missing) return true;
-    }
-    
-    for (let i = 0; i < trusted.length; i++) {
-        const doubled = trusted.slice(0, i + 1) + trusted[i] + trusted.slice(i + 1);
-        if (sender === doubled) return true;
-    }
-    
-    const commonReplacements = {
-        'a': ['s', 'q', 'z'], 'b': ['v', 'n', 'g'], 'c': ['x', 'v', 'd'],
-        'd': ['s', 'f', 'e'], 'e': ['w', 'r', 'd'], 'f': ['d', 'g', 'r'],
-        'g': ['f', 'h', 't'], 'h': ['g', 'j', 'y'], 'i': ['u', 'o', 'k'],
-        'j': ['h', 'k', 'u'], 'k': ['j', 'l', 'i'], 'l': ['k', 'o', 'p'],
-        'm': ['n', 'j', 'k'], 'n': ['b', 'm', 'h'], 'o': ['i', 'p', 'l'],
-        'p': ['o', 'l'], 'q': ['w', 'a'], 'r': ['e', 't', 'f'],
-        's': ['a', 'd', 'w'], 't': ['r', 'y', 'g'], 'u': ['y', 'i', 'j'],
-        'v': ['c', 'b', 'f'], 'w': ['q', 'e', 's'], 'x': ['z', 'c', 's'],
-        'y': ['t', 'u', 'h'], 'z': ['a', 'x', 's']
-    };
-    
-    for (let i = 0; i < trusted.length; i++) {
-        const char = trusted[i].toLowerCase();
-        if (commonReplacements[char]) {
-            for (const replacement of commonReplacements[char]) {
-                const replaced = trusted.slice(0, i) + replacement + trusted.slice(i + 1);
-                if (sender === replaced) return true;
-            }
-        }
-    }
-    
-    return false;
-}
-
-/**
- * Check for display name impersonation
- */
+// ============================================
+// DETECTION FUNCTIONS
+// ============================================
 function detectDisplayNameImpersonation(displayName, senderDomain) {
     if (!displayName) return null;
     
-    const lowerName = displayName.toLowerCase();
-    const isTrustedDomain = CONFIG.trustedDomains.some(d => senderDomain.includes(d));
+    const nameLower = displayName.toLowerCase();
     
-    if (isTrustedDomain) return null;
-    
-    for (const keyword of CONFIG.trustedCompanyKeywords) {
-        if (lowerName.includes(keyword.toLowerCase())) {
+    // Check if display name contains a trusted domain
+    for (const domain of CONFIG.trustedDomains) {
+        if (nameLower.includes(domain) && senderDomain !== domain) {
             return {
-                keyword: keyword,
-                displayName: displayName,
-                actualDomain: senderDomain
+                reason: `Display name contains "${domain}" but email is from "${senderDomain}"`,
+                impersonatedDomain: domain
+            };
+        }
+    }
+    
+    // Check for email-like patterns in display name
+    const emailPattern = /[\w.-]+@[\w.-]+\.\w+/;
+    const match = displayName.match(emailPattern);
+    if (match) {
+        const nameEmail = match[0].toLowerCase();
+        const actualEmail = senderDomain;
+        if (!nameEmail.includes(senderDomain)) {
+            return {
+                reason: `Display name shows "${nameEmail}" but actual sender domain is "${senderDomain}"`,
+                impersonatedDomain: nameEmail
             };
         }
     }
@@ -511,163 +348,121 @@ function detectDisplayNameImpersonation(displayName, senderDomain) {
     return null;
 }
 
-/**
- * Check for wire fraud keywords
- */
-function detectWireKeywords(body, subject) {
-    const text = `${subject} ${body}`.toLowerCase();
-    const foundKeywords = [];
-    
-    for (const keyword of CONFIG.wireKeywords) {
-        if (text.includes(keyword.toLowerCase())) {
-            foundKeywords.push(keyword);
+function detectHomoglyphs(email) {
+    let found = [];
+    for (const [homoglyph, latin] of Object.entries(HOMOGLYPHS)) {
+        if (email.includes(homoglyph)) {
+            found.push(`"${homoglyph}" looks like "${latin}"`);
         }
     }
-    
-    return foundKeywords;
+    return found.length > 0 ? found.join(', ') : null;
 }
 
-/**
- * Check if sender is first-time (not in contacts)
- */
-function isFirstTimeSender(email) {
-    return !knownSenders.has(email.toLowerCase());
+function detectLookalikeDomain(domain) {
+    for (const trusted of CONFIG.trustedDomains) {
+        const distance = levenshteinDistance(domain, trusted);
+        if (distance > 0 && distance <= 2) {
+            return { trustedDomain: trusted, distance: distance };
+        }
+    }
+    return null;
 }
 
-// ============================================================================
-// MAIN ANALYSIS
-// ============================================================================
+function detectWireFraudKeywords(content) {
+    const found = [];
+    for (const keyword of WIRE_FRAUD_KEYWORDS) {
+        if (content.includes(keyword.toLowerCase())) {
+            found.push(keyword);
+        }
+    }
+    return found;
+}
 
-async function analyzeEmail() {
-    showLoading();
+function detectContactLookalike(incomingEmail) {
+    const incomingParts = parseEmailParts(incomingEmail);
+    if (!incomingParts) return null;
     
-    try {
-        const emailData = await getEmailData();
+    for (const contactEmail of knownSenders) {
+        if (contactEmail === incomingEmail) continue;
         
-        // Skip if same email (avoid re-scanning on every tiny event)
-        if (emailData.itemId === currentItemId) {
-            console.log('Same email, using cached results');
-            return;
-        }
-        currentItemId = emailData.itemId;
+        const contactParts = parseEmailParts(contactEmail);
+        if (!contactParts) continue;
         
-        const warnings = [];
-        const scanResults = [];
-        
-        if (!emailData.from) {
-            throw new Error('Could not read email sender information');
-        }
-        
-        const senderEmail = emailData.from.emailAddress.toLowerCase();
-        const senderDomain = extractDomain(senderEmail);
-        const displayName = emailData.from.displayName;
-        
-        // 1. Reply-To Mismatch
-        if (emailData.replyTo && emailData.replyTo.emailAddress) {
-            const replyToEmail = emailData.replyTo.emailAddress.toLowerCase();
-            if (replyToEmail !== senderEmail) {
-                warnings.push({
-                    type: 'replyto-mismatch',
-                    severity: 'high',
-                    title: 'Reply-To Mismatch',
-                    description: 'Replies will go to a different address than the sender.',
-                    detail: `From: ${senderEmail}\nReply-To: ${replyToEmail}`
-                });
-                scanResults.push({ check: 'Reply-To Match', status: 'fail' });
-            } else {
-                scanResults.push({ check: 'Reply-To Match', status: 'pass' });
+        // Same domain, similar username (1-4 chars different)
+        if (incomingParts.domain === contactParts.domain) {
+            const localDistance = levenshteinDistance(incomingParts.local, contactParts.local);
+            if (localDistance > 0 && localDistance <= 4) {
+                return {
+                    incomingEmail: incomingEmail,
+                    matchedContact: contactEmail,
+                    reason: `Username is ${localDistance} character${localDistance > 1 ? 's' : ''} different`
+                };
             }
-        } else {
-            scanResults.push({ check: 'Reply-To Match', status: 'pass' });
         }
         
-        // 2. Display Name Impersonation
-        const impersonation = detectDisplayNameImpersonation(displayName, senderDomain);
-        if (impersonation) {
-            warnings.push({
-                type: 'impersonation',
-                severity: 'critical',
-                title: 'Possible Impersonation',
-                description: `Display name contains "${impersonation.keyword}" but email is from untrusted domain.`,
-                detail: `Name: ${impersonation.displayName}\nDomain: ${impersonation.actualDomain}`
-            });
-            scanResults.push({ check: 'Display Name Check', status: 'fail' });
-        } else {
-            scanResults.push({ check: 'Display Name Check', status: 'pass' });
+        // Similar domain (1-2 chars different)
+        const domainDistance = levenshteinDistance(incomingParts.domain, contactParts.domain);
+        if (domainDistance > 0 && domainDistance <= 2) {
+            return {
+                incomingEmail: incomingEmail,
+                matchedContact: contactEmail,
+                reason: `Domain is ${domainDistance} character${domainDistance > 1 ? 's' : ''} different`
+            };
         }
-        
-        // 3. Unicode/Homoglyph Detection
-        const homoglyphs = detectHomoglyphs(senderEmail);
-        if (homoglyphs.length > 0) {
-            warnings.push({
-                type: 'homoglyph',
-                severity: 'critical',
-                title: 'Suspicious Characters Detected',
-                description: 'Email address contains characters that look like normal letters but are actually different.',
-                detail: homoglyphs.map(h => `"${h.char}" looks like "${h.looksLike}" (code: ${h.code})`).join('\n')
-            });
-            scanResults.push({ check: 'Character Analysis', status: 'fail' });
-        } else {
-            scanResults.push({ check: 'Character Analysis', status: 'pass' });
-        }
-        
-        // 4. Lookalike Domain Detection
-        const lookalikes = detectLookalikeDomain(senderDomain);
-        if (lookalikes.length > 0) {
-            const match = lookalikes[0];
-            warnings.push({
-                type: 'lookalike',
-                severity: 'critical',
-                title: 'Lookalike Domain Detected',
-                description: `This domain looks similar to "${match.trustedDomain}" (${match.similarity}% match).`,
-                detail: `Sender: ${match.senderDomain}\nLooks like: ${match.trustedDomain}`
-            });
-            scanResults.push({ check: 'Domain Similarity', status: 'fail' });
-        } else {
-            scanResults.push({ check: 'Domain Similarity', status: 'pass' });
-        }
-        
-        // 5. Wire Fraud Keywords
-        const wireKeywords = detectWireKeywords(emailData.body, emailData.subject);
-        if (wireKeywords.length > 0) {
-            warnings.push({
-                type: 'wire-fraud',
-                severity: 'critical',
-                title: 'KEYWORD DETECTED',
-                description: `This email contains terms commonly used in fraud (${wireKeywords.join(', ')}). If payment is requested, verify by phone using a number you search for online - never use a number from this email.`,
-                detail: null,
-                isWireFraud: true
-            });
-            scanResults.push({ check: 'Wire Fraud Keywords', status: 'fail' });
-        } else {
-            scanResults.push({ check: 'Wire Fraud Keywords', status: 'pass' });
-        }
-        
-        // 6. First-Time Sender
-        const firstTime = isFirstTimeSender(senderEmail);
-        if (firstTime) {
-            scanResults.push({ check: 'Known Sender', status: 'info', note: 'First-time sender' });
-        } else {
-            scanResults.push({ check: 'Known Sender', status: 'pass' });
-        }
-        
-        // Display results
-        displayResults(emailData, warnings, scanResults, firstTime);
-        
-    } catch (error) {
-        console.error('Analysis error:', error);
-        showError(error.message);
     }
+    
+    return null;
 }
 
-// ============================================================================
-// UI RENDERING
-// ============================================================================
+function parseEmailParts(email) {
+    const parts = email.toLowerCase().split('@');
+    if (parts.length !== 2) return null;
+    return { local: parts[0], domain: parts[1], full: email.toLowerCase() };
+}
 
+function isTrustedDomain(domain) {
+    return CONFIG.trustedDomains.includes(domain.toLowerCase());
+}
+
+function levenshteinDistance(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    
+    const matrix = [];
+    
+    for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j] + 1
+                );
+            }
+        }
+    }
+    
+    return matrix[b.length][a.length];
+}
+
+// ============================================
+// UI FUNCTIONS
+// ============================================
 function showLoading() {
     document.getElementById('loading').classList.remove('hidden');
     document.getElementById('results').classList.add('hidden');
     document.getElementById('error').classList.add('hidden');
+    document.body.className = '';
 }
 
 function showError(message) {
@@ -675,34 +470,45 @@ function showError(message) {
     document.getElementById('results').classList.add('hidden');
     document.getElementById('error').classList.remove('hidden');
     document.getElementById('error-message').textContent = message;
+    document.body.className = '';
 }
 
-function displayResults(emailData, warnings, scanResults, isFirstTime) {
+function displayResults(warnings, scanResults, isFirstTime) {
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('error').classList.add('hidden');
     document.getElementById('results').classList.remove('hidden');
     
-    // Update status badge
-    const statusBadge = document.getElementById('status-badge');
+    // Count warnings by severity
     const criticalCount = warnings.filter(w => w.severity === 'critical').length;
-    const highCount = warnings.filter(w => w.severity === 'high').length;
+    const mediumCount = warnings.filter(w => w.severity === 'medium').length;
+    
+    // Set body background and status badge
+    document.body.classList.remove('status-critical', 'status-medium', 'status-info', 'status-safe');
+    
+    const statusBadge = document.getElementById('status-badge');
+    const statusIcon = statusBadge.querySelector('.status-icon');
+    const statusText = statusBadge.querySelector('.status-text');
     
     if (criticalCount > 0) {
+        document.body.classList.add('status-critical');
         statusBadge.className = 'status-badge danger';
-        statusBadge.querySelector('.status-icon').textContent = '🚨';
-        statusBadge.querySelector('.status-text').textContent = `${criticalCount} Critical Warning${criticalCount > 1 ? 's' : ''}`;
-    } else if (highCount > 0) {
+        statusIcon.textContent = '🚨';
+        statusText.textContent = `${criticalCount} Critical Warning${criticalCount > 1 ? 's' : ''}`;
+    } else if (mediumCount > 0) {
+        document.body.classList.add('status-medium');
         statusBadge.className = 'status-badge warning';
-        statusBadge.querySelector('.status-icon').textContent = '⚠️';
-        statusBadge.querySelector('.status-text').textContent = `${highCount} Warning${highCount > 1 ? 's' : ''}`;
+        statusIcon.textContent = '⚠️';
+        statusText.textContent = `${mediumCount} Warning${mediumCount > 1 ? 's' : ''}`;
     } else if (isFirstTime) {
-        statusBadge.className = 'status-badge warning';
-        statusBadge.querySelector('.status-icon').textContent = '👤';
-        statusBadge.querySelector('.status-text').textContent = 'First-Time Sender';
+        document.body.classList.add('status-info');
+        statusBadge.className = 'status-badge info';
+        statusIcon.textContent = '👤';
+        statusText.textContent = 'First-Time Sender';
     } else {
+        document.body.classList.add('status-safe');
         statusBadge.className = 'status-badge safe';
-        statusBadge.querySelector('.status-icon').textContent = '✅';
-        statusBadge.querySelector('.status-text').textContent = 'No Issues Detected';
+        statusIcon.textContent = '✅';
+        statusText.textContent = 'No Issues Detected';
     }
     
     // Display warnings
@@ -711,34 +517,36 @@ function displayResults(emailData, warnings, scanResults, isFirstTime) {
     
     if (warnings.length > 0) {
         warningsSection.classList.remove('hidden');
-        warningsList.innerHTML = warnings.map(w => `
-            <div class="warning-item ${w.severity}${w.isWireFraud ? ' wire-fraud' : ''}">
-                <div class="warning-title">${w.title}</div>
-                <div class="warning-description">${w.description}</div>
-                ${w.detail ? `<div class="warning-detail">${w.detail}</div>` : ''}
-            </div>
-        `).join('');
+        warningsList.innerHTML = warnings.map(w => {
+            let emailHtml = '';
+            if (w.senderEmail && w.matchedEmail) {
+                const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : 'Similar to';
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Sender:</span>
+                            <span class="warning-email-value">${w.senderEmail}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">${matchLabel}:</span>
+                            <span class="warning-email-value">${w.matchedEmail}</span>
+                        </div>
+                    </div>
+                `;
+            } else if (w.detail) {
+                emailHtml = `<div class="warning-detail" style="font-size:12px;color:#605e5c;margin-top:8px;">${w.detail}</div>`;
+            }
+            
+            return `
+                <div class="warning-item ${w.severity}">
+                    <div class="warning-title">${w.title}</div>
+                    <div class="warning-description">${w.description}</div>
+                    ${emailHtml}
+                </div>
+            `;
+        }).join('');
     } else {
         warningsSection.classList.add('hidden');
-    }
-    
-    // Display email info
-    document.getElementById('info-from').textContent = 
-        `${emailData.from.displayName} <${emailData.from.emailAddress}>`;
-    document.getElementById('info-replyto').textContent = 
-        emailData.replyTo ? `${emailData.replyTo.displayName} <${emailData.replyTo.emailAddress}>` : 'Same as From';
-    document.getElementById('info-subject').textContent = emailData.subject || '(No subject)';
-    
-    // Display first-time sender notice
-    const firstTimeSection = document.getElementById('first-time-section');
-    if (isFirstTime) {
-        firstTimeSection.classList.remove('hidden');
-        document.getElementById('first-time-info').innerHTML = `
-            <p><strong>${emailData.from.displayName || 'Unknown'}</strong></p>
-            <p class="email">${emailData.from.emailAddress}</p>
-        `;
-    } else {
-        firstTimeSection.classList.add('hidden');
     }
     
     // Display scan results
@@ -752,3 +560,6 @@ function displayResults(emailData, warnings, scanResults, isFirstTime) {
         </div>
     `).join('');
 }
+
+// Make toggleScanDetails globally accessible
+window.toggleScanDetails = toggleScanDetails;
