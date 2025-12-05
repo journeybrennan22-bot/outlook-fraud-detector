@@ -20,15 +20,15 @@ body.status-critical {
 }
 
 body.status-medium {
-    background: #f5d58a !important;
+    background: #f0c040 !important;
 }
 
 body.status-info {
-    background: #a3c9f5 !important;
+    background: #64b5f6 !important;
 }
 
 body.status-safe {
-    background: #a3f5aa !important;
+    background: #66bb6a !important;
 }
 
 #app {
