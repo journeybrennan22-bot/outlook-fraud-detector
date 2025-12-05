@@ -163,35 +163,21 @@ async function analyzeCurrentEmail() {
             await fetchContacts();
         }
         
-        // Get email data
+        // Get email data - in read mode, from and subject are direct properties
         const item = Office.context.mailbox.item;
+        const from = item.from;
+        const subject = item.subject;
         
-        item.from.getAsync((result) => {
-            if (result.status === Office.AsyncResultStatus.Succeeded) {
-                const from = result.value;
-                
-                // Get subject and body
-                item.subject.getAsync((subjectResult) => {
-                    item.body.getAsync(Office.CoercionType.Text, (bodyResult) => {
-                        // Get reply-to if available
-                        let replyTo = null;
-                        if (item.getItemIdAsync) {
-                            // Check for reply-to in internet headers if available
-                        }
-                        
-                        const emailData = {
-                            from: from,
-                            subject: subjectResult.status === Office.AsyncResultStatus.Succeeded ? subjectResult.value : '',
-                            body: bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '',
-                            replyTo: replyTo
-                        };
-                        
-                        performAnalysis(emailData);
-                    });
-                });
-            } else {
-                showError('Could not read email data');
-            }
+        // Body requires async call
+        item.body.getAsync(Office.CoercionType.Text, (bodyResult) => {
+            const emailData = {
+                from: from,
+                subject: subject || '',
+                body: bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '',
+                replyTo: null
+            };
+            
+            performAnalysis(emailData);
         });
     } catch (error) {
         showError(error.message);
