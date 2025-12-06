@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 2.1.0
+// Version 2.2.0
 
 // ============================================
 // CONFIGURATION
@@ -505,15 +505,16 @@ function displayResults(warnings, scanResults, isFirstTime) {
     const statusText = statusBadge.querySelector('.status-text');
     
     if (criticalCount > 0) {
+        const totalWarnings = criticalCount + mediumCount;
         document.body.classList.add('status-critical');
         statusBadge.className = 'status-badge danger';
         statusIcon.textContent = '🚨';
-        statusText.textContent = `${criticalCount} Critical Warning${criticalCount > 1 ? 's' : ''}`;
+        statusText.textContent = `${totalWarnings} Warning${totalWarnings > 1 ? 's' : ''} Detected`;
     } else if (mediumCount > 0) {
         document.body.classList.add('status-medium');
         statusBadge.className = 'status-badge warning';
         statusIcon.textContent = '⚠️';
-        statusText.textContent = `${mediumCount} Warning${mediumCount > 1 ? 's' : ''}`;
+        statusText.textContent = `${mediumCount} Warning${mediumCount > 1 ? 's' : ''} Detected`;
     } else if (isFirstTime) {
         document.body.classList.add('status-info');
         statusBadge.className = 'status-badge info';
