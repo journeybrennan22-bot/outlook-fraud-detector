@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 2.3.0
+// Version 2.4.0
 
 // ============================================
 // CONFIGURATION
@@ -11,16 +11,27 @@ const CONFIG = {
     trustedDomains: ['baynac.com', 'purelogicescrow.com', 'journeyinsurance.com']
 };
 
-// Wire fraud keywords
+// Fraud keywords
 const WIRE_FRAUD_KEYWORDS = [
-    // Real Estate / Escrow
-    'wire transfer', 'wire instructions', 'wiring instructions',
+    // Wire/Money Movement
+    'wire', 'wiring',
+    'ach transfer', 'direct deposit',
+    'zelle', 'venmo', 'cryptocurrency', 'bitcoin',
+    'send funds', 'transfer funds', 'remit funds',
+    
+    // Bank/Account Info
     'bank account', 'account number', 'routing number',
     'aba number', 'swift code', 'iban',
-    'updated wire', 'new wire', 'changed wire',
+    'bank statement', 'voided check',
+    
+    // Account Changes (red flag)
     'updated bank', 'new bank', 'changed bank',
-    'send funds', 'transfer funds', 'remit funds',
-    'urgent wire', 'immediate wire', 'same day wire',
+    'updated payment', 'new payment info',
+    'changed account', 'new account details',
+    'payment update', 'revised instructions',
+    'please update your records',
+    
+    // Real Estate / Escrow
     'closing funds', 'earnest money', 'escrow funds',
     
     // Legal / Attorney
@@ -29,32 +40,15 @@ const WIRE_FRAUD_KEYWORDS = [
     'client funds', 'case settlement',
     'court filing fee', 'legal fee',
     
-    // Urgency / Pressure
-    'urgent', 'asap', 'immediately',
-    'time sensitive', 'act now', 'right away',
-    'before end of day', 'by close of business',
-    'dont delay', 'must be done today',
-    
     // Secrecy Red Flags
     'keep this confidential', 'keep this quiet',
     'dont mention this', 'between us',
     'dont tell anyone', 'private matter',
     'off the record', 'handle personally',
     
-    // Account Change Scams
-    'updated payment', 'new payment info',
-    'changed account', 'new account details',
-    'payment update', 'revised instructions',
-    'please update your records',
-    
-    // ACH / Other Payment Methods
-    'ach transfer', 'direct deposit',
-    'zelle', 'venmo', 'cryptocurrency', 'bitcoin',
-    
     // Sensitive Data Requests
     'social security', 'ssn', 'tax id',
     'w-9', 'w9', 'ein number',
-    'bank statement', 'voided check',
     'login credentials', 'password reset',
     
     // Authority Impersonation
