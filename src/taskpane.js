@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 2.0.0
+// Version 2.1.0
 
 // ============================================
 // CONFIGURATION
@@ -168,16 +168,45 @@ async function analyzeCurrentEmail() {
         const from = item.from;
         const subject = item.subject;
         
-        // Body requires async call
+        // Get body and headers
         item.body.getAsync(Office.CoercionType.Text, (bodyResult) => {
-            const emailData = {
-                from: from,
-                subject: subject || '',
-                body: bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '',
-                replyTo: null
-            };
-            
-            performAnalysis(emailData);
+            // Try to get Reply-To from internet headers
+            if (item.getAllInternetHeadersAsync) {
+                item.getAllInternetHeadersAsync((headerResult) => {
+                    let replyTo = null;
+                    if (headerResult.status === Office.AsyncResultStatus.Succeeded) {
+                        const headers = headerResult.value;
+                        // Parse Reply-To header
+                        const replyToMatch = headers.match(/^Reply-To:\s*(.+)$/mi);
+                        if (replyToMatch) {
+                            // Extract email from header (handle "Name <email>" format)
+                            const emailMatch = replyToMatch[1].match(/<([^>]+)>/) || replyToMatch[1].match(/([^\s,]+@[^\s,]+)/);
+                            if (emailMatch) {
+                                replyTo = emailMatch[1].trim();
+                            }
+                        }
+                    }
+                    
+                    const emailData = {
+                        from: from,
+                        subject: subject || '',
+                        body: bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '',
+                        replyTo: replyTo
+                    };
+                    
+                    performAnalysis(emailData);
+                });
+            } else {
+                // Fallback if getAllInternetHeadersAsync not available
+                const emailData = {
+                    from: from,
+                    subject: subject || '',
+                    body: bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '',
+                    replyTo: null
+                };
+                
+                performAnalysis(emailData);
+            }
         });
     } catch (error) {
         showError(error.message);
