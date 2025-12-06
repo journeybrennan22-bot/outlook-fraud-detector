@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 2.2.0
+// Version 2.3.0
 
 // ============================================
 // CONFIGURATION
@@ -13,6 +13,7 @@ const CONFIG = {
 
 // Wire fraud keywords
 const WIRE_FRAUD_KEYWORDS = [
+    // Real Estate / Escrow
     'wire transfer', 'wire instructions', 'wiring instructions',
     'bank account', 'account number', 'routing number',
     'aba number', 'swift code', 'iban',
@@ -20,7 +21,45 @@ const WIRE_FRAUD_KEYWORDS = [
     'updated bank', 'new bank', 'changed bank',
     'send funds', 'transfer funds', 'remit funds',
     'urgent wire', 'immediate wire', 'same day wire',
-    'closing funds', 'earnest money', 'escrow funds'
+    'closing funds', 'earnest money', 'escrow funds',
+    
+    // Legal / Attorney
+    'settlement funds', 'settlement payment',
+    'retainer', 'trust account', 'iolta',
+    'client funds', 'case settlement',
+    'court filing fee', 'legal fee',
+    
+    // Urgency / Pressure
+    'urgent', 'asap', 'immediately',
+    'time sensitive', 'act now', 'right away',
+    'before end of day', 'by close of business',
+    'dont delay', 'must be done today',
+    
+    // Secrecy Red Flags
+    'keep this confidential', 'keep this quiet',
+    'dont mention this', 'between us',
+    'dont tell anyone', 'private matter',
+    'off the record', 'handle personally',
+    
+    // Account Change Scams
+    'updated payment', 'new payment info',
+    'changed account', 'new account details',
+    'payment update', 'revised instructions',
+    'please update your records',
+    
+    // ACH / Other Payment Methods
+    'ach transfer', 'direct deposit',
+    'zelle', 'venmo', 'cryptocurrency', 'bitcoin',
+    
+    // Sensitive Data Requests
+    'social security', 'ssn', 'tax id',
+    'w-9', 'w9', 'ein number',
+    'bank statement', 'voided check',
+    'login credentials', 'password reset',
+    
+    // Authority Impersonation
+    'ceo request', 'cfo request', 'owner request',
+    'boss asked', 'executive request', 'president asked'
 ];
 
 // Homoglyph characters
@@ -286,19 +325,19 @@ function performAnalysis(emailData) {
         scanResults.push({ check: 'Domain Similarity', status: 'pass' });
     }
     
-    // 5. Wire Fraud Keywords (CRITICAL)
+    // 5. Fraud Keywords (CRITICAL)
     const wireKeywords = detectWireFraudKeywords(fullContent);
     if (wireKeywords.length > 0) {
         warnings.push({
             type: 'wire-fraud',
             severity: 'critical',
-            title: 'Wire Fraud Keywords Detected',
-            description: `This email contains terms commonly used in wire fraud: "${wireKeywords.slice(0, 3).join('", "')}"${wireKeywords.length > 3 ? '...' : ''}`,
+            title: 'Fraud Keywords Detected',
+            description: `This email contains suspicious terms: "${wireKeywords.slice(0, 3).join('", "')}"${wireKeywords.length > 3 ? '...' : ''}`,
             isWireFraud: true
         });
-        scanResults.push({ check: 'Wire Fraud Keywords', status: 'fail' });
+        scanResults.push({ check: 'Fraud Keywords', status: 'fail' });
     } else {
-        scanResults.push({ check: 'Wire Fraud Keywords', status: 'pass' });
+        scanResults.push({ check: 'Fraud Keywords', status: 'pass' });
     }
     
     // 6. Contact Lookalike Detection (CRITICAL)
