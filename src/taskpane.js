@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 2.4.0
+// Version 2.5.0
 
 // ============================================
 // CONFIGURATION
@@ -100,7 +100,6 @@ function initializeMsal() {
 }
 
 function setupEventHandlers() {
-    document.getElementById('rescan-btn').addEventListener('click', analyzeCurrentEmail);
     document.getElementById('retry-btn').addEventListener('click', analyzeCurrentEmail);
 }
 
@@ -122,13 +121,6 @@ function onItemChanged() {
     if (isAutoScanEnabled) {
         analyzeCurrentEmail();
     }
-}
-
-function toggleScanDetails() {
-    const content = document.getElementById('scan-results');
-    const icon = document.getElementById('collapse-icon');
-    content.classList.toggle('collapsed');
-    icon.classList.toggle('collapsed');
 }
 
 // ============================================
@@ -248,7 +240,6 @@ async function analyzeCurrentEmail() {
 
 function performAnalysis(emailData) {
     const warnings = [];
-    const scanResults = [];
     
     const senderEmail = emailData.from.emailAddress.toLowerCase();
     const senderDomain = senderEmail.split('@')[1] || '';
@@ -267,9 +258,6 @@ function performAnalysis(emailData) {
             senderEmail: senderEmail,
             matchedEmail: emailData.replyTo.toLowerCase()
         });
-        scanResults.push({ check: 'Reply-To Match', status: 'fail' });
-    } else {
-        scanResults.push({ check: 'Reply-To Match', status: 'pass' });
     }
     
     // 2. Display Name Impersonation (CRITICAL)
@@ -283,9 +271,6 @@ function performAnalysis(emailData) {
             senderEmail: senderEmail,
             matchedEmail: impersonation.impersonatedDomain
         });
-        scanResults.push({ check: 'Display Name Check', status: 'fail' });
-    } else {
-        scanResults.push({ check: 'Display Name Check', status: 'pass' });
     }
     
     // 3. Homoglyph/Unicode Detection (CRITICAL)
@@ -298,9 +283,6 @@ function performAnalysis(emailData) {
             description: `The email address contains deceptive characters that look like normal letters.`,
             detail: homoglyph
         });
-        scanResults.push({ check: 'Character Analysis', status: 'fail' });
-    } else {
-        scanResults.push({ check: 'Character Analysis', status: 'pass' });
     }
     
     // 4. Lookalike Domain Detection (CRITICAL)
@@ -314,9 +296,6 @@ function performAnalysis(emailData) {
             senderEmail: senderEmail,
             matchedEmail: lookalike.trustedDomain
         });
-        scanResults.push({ check: 'Domain Similarity', status: 'fail' });
-    } else {
-        scanResults.push({ check: 'Domain Similarity', status: 'pass' });
     }
     
     // 5. Fraud Keywords (CRITICAL)
@@ -329,9 +308,6 @@ function performAnalysis(emailData) {
             description: `This email contains suspicious terms: "${wireKeywords.slice(0, 3).join('", "')}"${wireKeywords.length > 3 ? '...' : ''}`,
             isWireFraud: true
         });
-        scanResults.push({ check: 'Fraud Keywords', status: 'fail' });
-    } else {
-        scanResults.push({ check: 'Fraud Keywords', status: 'pass' });
     }
     
     // 6. Contact Lookalike Detection (CRITICAL)
@@ -345,20 +321,12 @@ function performAnalysis(emailData) {
             senderEmail: contactLookalike.incomingEmail,
             matchedEmail: contactLookalike.matchedContact
         });
-        scanResults.push({ check: 'Contact Match', status: 'fail' });
-    } else {
-        scanResults.push({ check: 'Contact Match', status: 'pass' });
     }
     
-    // 7. First-Time Sender Check
+    // Check first-time sender status
     const isFirstTime = !knownSenders.has(senderEmail) && !isTrustedDomain(senderDomain);
-    if (isFirstTime) {
-        scanResults.push({ check: 'Known Sender', status: 'info', note: 'First-time sender' });
-    } else {
-        scanResults.push({ check: 'Known Sender', status: 'pass' });
-    }
     
-    displayResults(warnings, scanResults, isFirstTime);
+    displayResults(warnings, isFirstTime);
 }
 
 // ============================================
@@ -521,7 +489,7 @@ function showError(message) {
     document.body.className = '';
 }
 
-function displayResults(warnings, scanResults, isFirstTime) {
+function displayResults(warnings, isFirstTime) {
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('error').classList.add('hidden');
     document.getElementById('results').classList.remove('hidden');
@@ -563,9 +531,14 @@ function displayResults(warnings, scanResults, isFirstTime) {
     // Display warnings
     const warningsSection = document.getElementById('warnings-section');
     const warningsList = document.getElementById('warnings-list');
+    const warningsFooter = document.getElementById('warnings-footer');
+    const safeMessage = document.getElementById('safe-message');
     
     if (warnings.length > 0) {
         warningsSection.classList.remove('hidden');
+        warningsFooter.classList.remove('hidden');
+        safeMessage.classList.add('hidden');
+        
         warningsList.innerHTML = warnings.map(w => {
             let emailHtml = '';
             if (w.senderEmail && w.matchedEmail) {
@@ -596,19 +569,7 @@ function displayResults(warnings, scanResults, isFirstTime) {
         }).join('');
     } else {
         warningsSection.classList.add('hidden');
+        warningsFooter.classList.add('hidden');
+        safeMessage.classList.remove('hidden');
     }
-    
-    // Display scan results
-    const scanResultsEl = document.getElementById('scan-results');
-    scanResultsEl.innerHTML = scanResults.map(r => `
-        <div class="scan-item">
-            <span class="scan-check ${r.status === 'pass' ? 'scan-pass' : r.status === 'fail' ? 'scan-fail' : 'scan-info'}">
-                ${r.status === 'pass' ? '✓' : r.status === 'fail' ? '✗' : 'ℹ'}
-            </span>
-            <span>${r.check}${r.note ? ` (${r.note})` : ''}</span>
-        </div>
-    `).join('');
 }
-
-// Make toggleScanDetails globally accessible
-window.toggleScanDetails = toggleScanDetails;
