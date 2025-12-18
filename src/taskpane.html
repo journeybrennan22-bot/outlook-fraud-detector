@@ -15,7 +15,6 @@
             <div class="spinner"></div>
             <p>Analyzing email...</p>
         </div>
-
         <!-- Results Container -->
         <div id="results" class="results hidden">
             <!-- Status Badge -->
@@ -23,40 +22,26 @@
                 <span class="status-icon"></span>
                 <span class="status-text"></span>
             </div>
-
             <!-- Warnings Section -->
             <div id="warnings-section" class="section hidden">
                 <div id="warnings-list" class="warnings-list"></div>
+                <div id="warnings-footer" class="warnings-footer hidden">
+                    <p class="warning-advice">These are tactics scammers use to impersonate people you trust.</p>
+                    <a href="https://emailfraudalert.com/learn.html" target="_blank" class="learn-link">Learn how scams work →</a>
+                </div>
             </div>
-
-            <!-- Scan Details -->
-            <div id="scan-details" class="section">
-                <h2 class="collapsible-header" onclick="toggleScanDetails()">
-                    🔍 Scan Details
-                    <span id="collapse-icon" class="collapse-icon">▼</span>
-                </h2>
-                <div id="scan-results" class="collapsible-content"></div>
+            <!-- Safe State Message -->
+            <div id="safe-message" class="safe-message hidden">
+                <p>No warning signs detected in this email.</p>
             </div>
         </div>
-
         <!-- Error State -->
         <div id="error" class="error hidden">
             <div class="error-icon">❌</div>
             <p id="error-message">An error occurred.</p>
             <button id="retry-btn" class="btn btn-primary">Retry</button>
         </div>
-
-        <!-- Footer -->
-        <footer class="footer">
-            <button id="rescan-btn" class="btn btn-secondary">Re-scan Email</button>
-            <div id="auto-scan-status" class="auto-scan-status">
-                <span class="auto-scan-indicator on"></span>
-                Auto-scan ON
-            </div>
-            <p class="version">v2.4.0</p>
-        </footer>
     </div>
-
     <script src="taskpane.js"></script>
 </body>
 </html>
