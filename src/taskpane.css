@@ -35,7 +35,7 @@ body.status-safe {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    padding: 12px;
+    padding: 10px;
 }
 
 /* Loading State */
@@ -82,11 +82,12 @@ body.status-safe {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 14px;
+    padding: 10px 12px;
     border-radius: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     font-weight: 600;
     font-size: 15px;
+    flex-shrink: 0;
 }
 
 .status-badge.danger {
@@ -123,18 +124,21 @@ body.status-safe {
 
 /* Section Styles */
 .section {
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.95);
     border-radius: 8px;
-    padding: 12px 12px 24px 12px;
-    margin-bottom: 10px;
+    padding: 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Warnings */
 .warnings-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
+    flex-shrink: 0;
 }
 
 .warning-item {
@@ -201,36 +205,37 @@ body.status-safe {
     display: block;
 }
 
-/* Warnings Footer - outside card on colored background */
+/* Warnings Footer - inside card at bottom */
 .warnings-footer {
     margin-top: auto;
-    padding: 16px 12px 20px 12px;
+    padding-top: 16px;
     text-align: center;
 }
 
 .learn-btn {
     display: inline-block;
     padding: 10px 20px;
-    background: white;
-    color: #0078d4;
+    background: #0078d4;
+    color: white;
     text-decoration: none;
     font-weight: 600;
     font-size: 13px;
     border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     transition: all 0.2s;
 }
 
 .learn-btn:hover {
-    background: #f3f2f1;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    transform: translateY(-1px);
+    background: #106ebe;
 }
 
 /* Safe State Message */
 .safe-message {
     text-align: center;
     padding: 20px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .safe-message p {
@@ -270,4 +275,4 @@ body.status-safe {
 }
 
 .btn-primary {
-    backgroun
+    background: #
