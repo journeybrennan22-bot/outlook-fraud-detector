@@ -35,7 +35,7 @@ body.status-safe {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    padding: 16px;
+    padding: 12px;
 }
 
 /* Loading State */
@@ -80,11 +80,11 @@ body.status-safe {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 14px 16px;
+    padding: 10px 14px;
     border-radius: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     font-weight: 600;
-    font-size: 16px;
+    font-size: 15px;
 }
 
 .status-badge.danger {
@@ -123,8 +123,8 @@ body.status-safe {
 .section {
     background: rgba(255, 255, 255, 0.85);
     border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -132,11 +132,11 @@ body.status-safe {
 .warnings-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
 }
 
 .warning-item {
-    padding: 14px;
+    padding: 10px 12px;
     border-radius: 6px;
     border-left: 4px solid;
 }
@@ -153,28 +153,28 @@ body.status-safe {
 
 .warning-title {
     font-weight: 700;
-    font-size: 15px;
-    margin-bottom: 6px;
+    font-size: 14px;
+    margin-bottom: 4px;
     color: #323130;
 }
 
 .warning-description {
-    font-size: 13px;
+    font-size: 12px;
     color: #323130;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     line-height: 1.4;
 }
 
 /* Email display in warnings */
 .warning-emails {
-    margin-top: 10px;
-    padding: 10px;
+    margin-top: 8px;
+    padding: 8px;
     background: rgba(255, 255, 255, 0.8);
     border-radius: 4px;
 }
 
 .warning-email-row {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .warning-email-row:last-child {
@@ -191,7 +191,7 @@ body.status-safe {
 }
 
 .warning-email-value {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     font-family: 'Consolas', 'Courier New', monospace;
     color: #a80000;
@@ -201,27 +201,27 @@ body.status-safe {
 
 /* Warnings Footer - outside card on colored background */
 .warnings-footer {
-    margin-top: 16px;
-    padding: 16px;
+    margin-top: 12px;
+    padding: 12px;
     text-align: center;
 }
 
 .warning-advice {
-    font-size: 14px;
+    font-size: 13px;
     color: #323130;
-    margin-bottom: 14px;
-    line-height: 1.5;
+    margin-bottom: 10px;
+    line-height: 1.4;
     font-weight: 500;
 }
 
 .learn-btn {
     display: inline-block;
-    padding: 12px 24px;
+    padding: 10px 20px;
     background: white;
     color: #0078d4;
     text-decoration: none;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
     border-radius: 6px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     transition: all 0.2s;
