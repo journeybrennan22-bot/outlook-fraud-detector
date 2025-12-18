@@ -87,7 +87,6 @@ body.status-safe {
     margin-bottom: 10px;
     font-weight: 600;
     font-size: 15px;
-    flex-shrink: 0;
 }
 
 .status-badge.danger {
@@ -126,24 +125,20 @@ body.status-safe {
 .section {
     background: rgba(255, 255, 255, 0.95);
     border-radius: 8px;
-    padding: 12px 12px 16px 12px;
+    padding: 14px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 0;
 }
 
 /* Warnings */
 .warnings-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    flex-shrink: 0;
+    gap: 14px;
 }
 
 .warning-item {
-    padding: 12px 10px;
+    padding: 14px 12px;
     border-radius: 6px;
     border-left: 4px solid;
 }
@@ -160,16 +155,16 @@ body.status-safe {
 
 .warning-title {
     font-weight: 700;
-    font-size: 15px;
-    margin-bottom: 4px;
+    font-size: 16px;
+    margin-bottom: 6px;
     color: #323130;
 }
 
 .warning-description {
     font-size: 14px;
     color: #323130;
-    margin-bottom: 8px;
-    line-height: 1.4;
+    margin-bottom: 10px;
+    line-height: 1.5;
 }
 
 /* Email display in warnings */
@@ -206,10 +201,9 @@ body.status-safe {
     display: block;
 }
 
-/* Warnings Footer - inside card at bottom */
+/* Warnings Footer - inside card after warnings */
 .warnings-footer {
-    margin-top: auto;
-    padding-top: 20px;
+    padding-top: 16px;
     text-align: center;
 }
 
@@ -217,7 +211,7 @@ body.status-safe {
     display: inline-block;
     padding: 10px 20px;
     background: #f5a3aa;
-    color: white;
+    color: #323130;
     text-decoration: none;
     font-weight: 600;
     font-size: 13px;
@@ -232,11 +226,13 @@ body.status-safe {
 /* Safe State Message */
 .safe-message {
     text-align: center;
-    padding: 20px;
+    padding: 40px 20px;
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 8px;
 }
 
 .safe-message p {
@@ -272,4 +268,14 @@ body.status-safe {
     font-weight: 600;
     cursor: pointer;
     border: none;
-    transition: background-color 0.2s
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background: #0078d4;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #106ebe;
+}
