@@ -199,31 +199,38 @@ body.status-safe {
     display: block;
 }
 
-/* Warnings Footer - advice and link */
+/* Warnings Footer - outside card on colored background */
 .warnings-footer {
     margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 16px;
     text-align: center;
 }
 
 .warning-advice {
-    font-size: 13px;
+    font-size: 14px;
     color: #323130;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     line-height: 1.5;
+    font-weight: 500;
 }
 
-.learn-link {
+.learn-btn {
     display: inline-block;
-    font-size: 13px;
+    padding: 12px 24px;
+    background: white;
     color: #0078d4;
     text-decoration: none;
     font-weight: 600;
+    font-size: 14px;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s;
 }
 
-.learn-link:hover {
-    text-decoration: underline;
+.learn-btn:hover {
+    background: #f3f2f1;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
 }
 
 /* Safe State Message */
