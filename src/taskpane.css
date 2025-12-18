@@ -73,6 +73,8 @@ body.status-safe {
 /* Results Container */
 .results {
     flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Status Badge */
@@ -123,7 +125,7 @@ body.status-safe {
 .section {
     background: rgba(255, 255, 255, 0.85);
     border-radius: 8px;
-    padding: 16px;
+    padding: 12px 12px 24px 12px;
     margin-bottom: 10px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -136,7 +138,7 @@ body.status-safe {
 }
 
 .warning-item {
-    padding: 14px;
+    padding: 12px 10px;
     border-radius: 6px;
     border-left: 4px solid;
 }
@@ -153,16 +155,16 @@ body.status-safe {
 
 .warning-title {
     font-weight: 700;
-    font-size: 16px;
-    margin-bottom: 6px;
+    font-size: 15px;
+    margin-bottom: 4px;
     color: #323130;
 }
 
 .warning-description {
     font-size: 14px;
     color: #323130;
-    margin-bottom: 10px;
-    line-height: 1.5;
+    margin-bottom: 8px;
+    line-height: 1.4;
 }
 
 /* Email display in warnings */
@@ -201,8 +203,8 @@ body.status-safe {
 
 /* Warnings Footer - outside card on colored background */
 .warnings-footer {
-    margin-top: 32px;
-    padding: 12px;
+    margin-top: auto;
+    padding: 16px 12px 20px 12px;
     text-align: center;
 }
 
@@ -268,10 +270,4 @@ body.status-safe {
 }
 
 .btn-primary {
-    background: #0078d4;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #106ebe;
-}
+    backgroun
