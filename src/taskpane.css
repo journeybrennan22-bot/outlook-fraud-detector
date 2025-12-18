@@ -199,67 +199,42 @@ body.status-safe {
     display: block;
 }
 
-/* Collapsible Scan Details */
-.collapsible-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    margin: 0;
-    padding: 0;
-    user-select: none;
-}
-
-.collapse-icon {
-    font-size: 12px;
-    transition: transform 0.2s;
-}
-
-.collapse-icon.collapsed {
-    transform: rotate(-90deg);
-}
-
-.collapsible-content {
-    margin-top: 12px;
-}
-
-.collapsible-content.collapsed {
-    display: none;
-}
-
-/* Scan Results */
-.scan-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 0;
-    font-size: 13px;
-    border-bottom: 1px solid #edebe9;
-}
-
-.scan-item:last-child {
-    border-bottom: none;
-}
-
-.scan-check {
-    font-size: 14px;
-    font-weight: bold;
-    width: 20px;
+/* Warnings Footer - advice and link */
+.warnings-footer {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
     text-align: center;
 }
 
-.scan-pass {
-    color: #107c10;
+.warning-advice {
+    font-size: 13px;
+    color: #323130;
+    margin-bottom: 12px;
+    line-height: 1.5;
 }
 
-.scan-fail {
-    color: #a80000;
-}
-
-.scan-info {
+.learn-link {
+    display: inline-block;
+    font-size: 13px;
     color: #0078d4;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.learn-link:hover {
+    text-decoration: underline;
+}
+
+/* Safe State Message */
+.safe-message {
+    text-align: center;
+    padding: 20px;
+}
+
+.safe-message p {
+    font-size: 14px;
+    color: #323130;
 }
 
 /* Error State */
@@ -300,51 +275,4 @@ body.status-safe {
 
 .btn-primary:hover {
     background: #106ebe;
-}
-
-.btn-secondary {
-    background: white;
-    color: #323130;
-    border: 1px solid #8a8886;
-}
-
-.btn-secondary:hover {
-    background: #f3f2f1;
-}
-
-/* Footer */
-.footer {
-    margin-top: auto;
-    padding-top: 16px;
-    text-align: center;
-}
-
-.auto-scan-status {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    margin-top: 10px;
-    font-size: 12px;
-    color: #605e5c;
-}
-
-.auto-scan-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-}
-
-.auto-scan-indicator.on {
-    background: #107c10;
-}
-
-.auto-scan-indicator.off {
-    background: #a80000;
-}
-
-.version {
-    margin-top: 8px;
-    font-size: 11px;
-    color: #a19f9d;
 }
