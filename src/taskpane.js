@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 2.5.0
+// Version 2.6.0 - Scans Contacts + Inbox senders + Sent recipients
 
 // ============================================
 // CONFIGURATION
@@ -7,7 +7,7 @@
 const CONFIG = {
     clientId: '622f0452-d622-45d1-aab3-3a2026389dd3',
     redirectUri: 'https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html',
-    scopes: ['User.Read', 'Contacts.Read'],
+    scopes: ['User.Read', 'Contacts.Read', 'Mail.Read'],
     trustedDomains: ['baynac.com', 'purelogicescrow.com', 'journeyinsurance.com']
 };
 
@@ -124,7 +124,7 @@ function onItemChanged() {
 }
 
 // ============================================
-// AUTHENTICATION & CONTACTS
+// AUTHENTICATION & DATA FETCHING
 // ============================================
 async function getAccessToken() {
     if (!msalInstance) return null;
@@ -150,30 +150,161 @@ async function getAccessToken() {
     }
 }
 
-async function fetchContacts() {
-    const token = await getAccessToken();
-    if (!token) return;
+/**
+ * Fetch contacts from Microsoft Graph
+ */
+async function fetchContacts(token) {
+    const contacts = [];
     
     try {
-        const response = await fetch('https://graph.microsoft.com/v1.0/me/contacts?$top=500&$select=emailAddresses', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        let url = 'https://graph.microsoft.com/v1.0/me/contacts?$top=500&$select=emailAddresses';
         
-        if (response.ok) {
-            const data = await response.json();
-            data.value.forEach(contact => {
-                if (contact.emailAddresses) {
-                    contact.emailAddresses.forEach(email => {
-                        if (email.address) {
-                            knownSenders.add(email.address.toLowerCase());
-                        }
-                    });
-                }
+        while (url) {
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
+            
+            if (!response.ok) break;
+            
+            const data = await response.json();
+            
+            if (data.value) {
+                data.value.forEach(contact => {
+                    if (contact.emailAddresses) {
+                        contact.emailAddresses.forEach(email => {
+                            if (email.address) {
+                                contacts.push(email.address.toLowerCase());
+                            }
+                        });
+                    }
+                });
+            }
+            
+            url = data['@odata.nextLink'] || null;
         }
+        
+        console.log('Fetched', contacts.length, 'contacts');
     } catch (error) {
         console.log('Contacts fetch error:', error);
     }
+    
+    return contacts;
+}
+
+/**
+ * Fetch senders from inbox (people who have emailed you)
+ */
+async function fetchInboxSenders(token, maxMessages = 500) {
+    const senders = [];
+    
+    try {
+        let url = `https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=100&$select=from`;
+        let fetched = 0;
+        
+        while (url && fetched < maxMessages) {
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (!response.ok) break;
+            
+            const data = await response.json();
+            
+            if (data.value) {
+                data.value.forEach(message => {
+                    if (message.from && message.from.emailAddress && message.from.emailAddress.address) {
+                        senders.push(message.from.emailAddress.address.toLowerCase());
+                    }
+                });
+                fetched += data.value.length;
+            }
+            
+            url = data['@odata.nextLink'] || null;
+        }
+        
+        console.log('Fetched', senders.length, 'inbox senders');
+    } catch (error) {
+        console.log('Inbox fetch error:', error);
+    }
+    
+    return senders;
+}
+
+/**
+ * Fetch recipients from sent folder (people you have emailed)
+ */
+async function fetchSentRecipients(token, maxMessages = 500) {
+    const recipients = [];
+    
+    try {
+        let url = `https://graph.microsoft.com/v1.0/me/mailFolders/sentItems/messages?$top=100&$select=toRecipients,ccRecipients`;
+        let fetched = 0;
+        
+        while (url && fetched < maxMessages) {
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (!response.ok) break;
+            
+            const data = await response.json();
+            
+            if (data.value) {
+                data.value.forEach(message => {
+                    if (message.toRecipients) {
+                        message.toRecipients.forEach(r => {
+                            if (r.emailAddress && r.emailAddress.address) {
+                                recipients.push(r.emailAddress.address.toLowerCase());
+                            }
+                        });
+                    }
+                    if (message.ccRecipients) {
+                        message.ccRecipients.forEach(r => {
+                            if (r.emailAddress && r.emailAddress.address) {
+                                recipients.push(r.emailAddress.address.toLowerCase());
+                            }
+                        });
+                    }
+                });
+                fetched += data.value.length;
+            }
+            
+            url = data['@odata.nextLink'] || null;
+        }
+        
+        console.log('Fetched', recipients.length, 'sent recipients');
+    } catch (error) {
+        console.log('Sent fetch error:', error);
+    }
+    
+    return recipients;
+}
+
+/**
+ * Fetch ALL known senders: Contacts + Inbox + Sent
+ */
+async function fetchAllKnownSenders() {
+    const token = await getAccessToken();
+    if (!token) return;
+    
+    console.log('Fetching all known senders...');
+    
+    // Fetch from all three sources in parallel
+    const [contacts, inboxSenders, sentRecipients] = await Promise.all([
+        fetchContacts(token),
+        fetchInboxSenders(token, 500),
+        fetchSentRecipients(token, 500)
+    ]);
+    
+    // Add all to the knownSenders set (automatically deduplicates)
+    contacts.forEach(e => knownSenders.add(e));
+    inboxSenders.forEach(e => knownSenders.add(e));
+    sentRecipients.forEach(e => knownSenders.add(e));
+    
+    console.log('Total unique known senders:', knownSenders.size);
+    console.log('  - From Contacts:', new Set(contacts).size);
+    console.log('  - From Inbox:', new Set(inboxSenders).size);
+    console.log('  - From Sent:', new Set(sentRecipients).size);
 }
 
 // ============================================
@@ -183,9 +314,9 @@ async function analyzeCurrentEmail() {
     showLoading();
     
     try {
-        // Fetch contacts if not already loaded
+        // Fetch all known senders if not already loaded
         if (knownSenders.size === 0) {
-            await fetchContacts();
+            await fetchAllKnownSenders();
         }
         
         // Get email data - in read mode, from and subject are direct properties
