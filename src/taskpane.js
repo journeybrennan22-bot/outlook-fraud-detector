@@ -374,16 +374,19 @@ function performAnalysis(emailData) {
     // Skip if sender is in known contacts
     const isKnownContact = knownContacts.has(senderEmail);
     
-    // 1. Reply-To Mismatch
+    // 1. Reply-To Mismatch (only flag if different domain)
     if (emailData.replyTo && emailData.replyTo.toLowerCase() !== senderEmail) {
-        warnings.push({
-            type: 'replyto-mismatch',
-            severity: 'critical',
-            title: 'Reply-To Mismatch',
-            description: 'Replies will go to a different address than the sender.',
-            senderEmail: senderEmail,
-            matchedEmail: emailData.replyTo.toLowerCase()
-        });
+        const replyToDomain = emailData.replyTo.toLowerCase().split('@')[1] || '';
+        if (replyToDomain !== senderDomain) {
+            warnings.push({
+                type: 'replyto-mismatch',
+                severity: 'critical',
+                title: 'Reply-To Mismatch',
+                description: 'Replies will go to a different address than the sender.',
+                senderEmail: senderEmail,
+                matchedEmail: emailData.replyTo.toLowerCase()
+            });
+        }
     }
     
     // 2. Deceptive TLD Detection
