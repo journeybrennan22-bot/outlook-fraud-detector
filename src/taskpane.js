@@ -91,7 +91,7 @@ const KEYWORD_CATEGORIES = {
             'dont tell anyone', 'private matter',
             'off the record', 'handle personally'
         ],
-        explanation: 'Requests for secrecy are a major red flag. Legitimate transactions don\'t require you to bypass normal verification procedures.'
+        explanation: "Requests for secrecy are a major red flag. Legitimate transactions don't require you to bypass normal verification procedures."
     },
     'Sensitive Data Requests': {
         keywords: [
@@ -885,4 +885,7 @@ function displayResults(warnings, senderEmail) {
         }
     } else {
         warningsSection.classList.add('hidden');
-        if (warningsFooter) warningsFooter.classList.add('
+        if (warningsFooter) warningsFooter.classList.add('hidden');
+        if (safeMessage) safeMessage.classList.remove('hidden');
+    }
+}
