@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 2.7.0 - Contacts only (fast sync)
+// Version 2.9.0 - Full scam detection (all domains)
 
 // ============================================
 // CONFIGURATION
@@ -10,6 +10,48 @@ const CONFIG = {
     scopes: ['User.Read', 'Contacts.Read'],
     trustedDomains: ['baynac.com', 'purelogicescrow.com', 'journeyinsurance.com']
 };
+
+// Major brands that scammers commonly impersonate
+const PROTECTED_BRANDS = [
+    // Banks
+    'chase', 'wellsfargo', 'bankofamerica', 'citi', 'citibank', 'usbank', 
+    'capitalone', 'pnc', 'tdbank', 'regions', 'suntrust', 'truist',
+    'schwab', 'fidelity', 'vanguard', 'merrill', 'morganstanley',
+    
+    // Tech Companies
+    'microsoft', 'apple', 'google', 'amazon', 'meta', 'facebook',
+    'netflix', 'spotify', 'adobe', 'dropbox', 'zoom', 'slack',
+    
+    // Payment Services
+    'paypal', 'venmo', 'zelle', 'cashapp', 'stripe', 'square',
+    
+    // Email Providers
+    'gmail', 'outlook', 'yahoo', 'hotmail', 'icloud', 'protonmail',
+    
+    // Government
+    'irs', 'ssa', 'medicare', 'socialsecurity', 'dmv', 'usps',
+    
+    // Shipping
+    'fedex', 'ups', 'dhl', 'usps',
+    
+    // E-commerce
+    'ebay', 'walmart', 'target', 'costco', 'bestbuy', 'homedepot',
+    
+    // Social Media
+    'twitter', 'instagram', 'linkedin', 'tiktok', 'snapchat',
+    
+    // Real Estate / Title
+    'firstamerican', 'fidelitynational', 'oldrepublic', 'stewartitle',
+    'chicagotitle', 'northamerican'
+];
+
+// Deceptive TLDs that look like .com but aren't
+const DECEPTIVE_TLDS = [
+    '.com.co', '.com.br', '.com.mx', '.com.ar', '.com.au', '.com.ng',
+    '.com.pk', '.com.ph', '.com.ua', '.com.ve', '.com.vn', '.com.tr',
+    '.net.co', '.net.br', '.org.co', '.co.uk.com', '.us.com',
+    '.co', '.cm', '.cc', '.ru', '.cn', '.tk', '.ml', '.ga', '.cf'
+];
 
 // Fraud keywords
 const WIRE_FRAUD_KEYWORDS = [
@@ -56,7 +98,14 @@ const WIRE_FRAUD_KEYWORDS = [
     
     // Authority Impersonation
     'ceo request', 'cfo request', 'owner request',
-    'boss asked', 'executive request', 'president asked'
+    'boss asked', 'executive request', 'president asked',
+    
+    // Urgency Phrases
+    'verify your account', 'verify immediately', 'act now',
+    'urgent action required', 'account suspended', 'account will be closed',
+    'unusual activity', 'suspicious activity', 'unauthorized access',
+    'confirm your identity', 'verify your identity',
+    'action required within', 'expires today', 'last chance'
 ];
 
 // Homoglyph characters (Cyrillic only - removed 0/1 to avoid false positives)
@@ -304,7 +353,33 @@ function performAnalysis(emailData) {
         });
     }
     
-    // 2. Display Name Impersonation (skip if known contact)
+    // 2. Deceptive TLD Detection (checks all domains)
+    const deceptiveTld = detectDeceptiveTLD(senderDomain);
+    if (deceptiveTld) {
+        warnings.push({
+            type: 'deceptive-tld',
+            severity: 'critical',
+            title: 'Deceptive Domain',
+            description: `This domain uses "${deceptiveTld}" which is designed to look like a legitimate .com address.`,
+            senderEmail: senderEmail,
+            matchedEmail: deceptiveTld
+        });
+    }
+    
+    // 3. Brand Impersonation Detection (checks major brands)
+    const brandImpersonation = detectBrandImpersonation(senderDomain, displayName);
+    if (brandImpersonation) {
+        warnings.push({
+            type: 'brand-impersonation',
+            severity: 'critical',
+            title: 'Possible Brand Impersonation',
+            description: brandImpersonation.reason,
+            senderEmail: senderEmail,
+            matchedEmail: brandImpersonation.brand
+        });
+    }
+    
+    // 4. Display Name Impersonation (skip if known contact)
     if (!isKnownContact) {
         const impersonation = detectDisplayNameImpersonation(displayName, senderDomain);
         if (impersonation) {
@@ -319,7 +394,7 @@ function performAnalysis(emailData) {
         }
     }
     
-    // 3. Homoglyph/Unicode Detection
+    // 5. Homoglyph/Unicode Detection
     const homoglyph = detectHomoglyphs(senderEmail);
     if (homoglyph) {
         warnings.push({
@@ -333,7 +408,7 @@ function performAnalysis(emailData) {
         });
     }
     
-    // 4. Lookalike Domain Detection
+    // 6. Lookalike Domain Detection (your trusted domains)
     const lookalike = detectLookalikeDomain(senderDomain);
     if (lookalike) {
         warnings.push({
@@ -346,7 +421,7 @@ function performAnalysis(emailData) {
         });
     }
     
-    // 5. Fraud Keywords
+    // 7. Fraud Keywords
     const wireKeywords = detectWireFraudKeywords(fullContent);
     if (wireKeywords.length > 0) {
         warnings.push({
@@ -359,7 +434,7 @@ function performAnalysis(emailData) {
         });
     }
     
-    // 6. Contact Lookalike Detection (skip if known contact)
+    // 8. Contact Lookalike Detection (skip if known contact)
     if (!isKnownContact) {
         const contactLookalike = detectContactLookalike(senderEmail);
         if (contactLookalike) {
@@ -375,15 +450,77 @@ function performAnalysis(emailData) {
         }
     }
     
-    // Check first-time sender status
-    const isFirstTime = !isKnownContact && !isTrustedDomain(senderDomain);
-    
-    displayResults(warnings, isFirstTime, senderEmail);
+    displayResults(warnings, senderEmail);
 }
 
 // ============================================
 // DETECTION FUNCTIONS
 // ============================================
+
+/**
+ * Detect deceptive TLDs like .com.co, .com.br, etc.
+ */
+function detectDeceptiveTLD(domain) {
+    const domainLower = domain.toLowerCase();
+    
+    for (const tld of DECEPTIVE_TLDS) {
+        if (domainLower.endsWith(tld)) {
+            return tld;
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Detect brand impersonation in domain or display name
+ */
+function detectBrandImpersonation(domain, displayName) {
+    const domainLower = domain.toLowerCase();
+    const displayLower = (displayName || '').toLowerCase();
+    
+    // Get the domain name without TLD
+    const domainParts = domainLower.split('.');
+    const domainName = domainParts[0];
+    
+    for (const brand of PROTECTED_BRANDS) {
+        // Check for hyphenated brand domains (e.g., paypal-secure.com, chase-alert.com)
+        if (domainName.includes(brand) && domainName !== brand) {
+            // Make sure it's not the legitimate domain
+            const legitimateDomain = brand + '.com';
+            if (domainLower !== legitimateDomain && !domainLower.endsWith('.' + legitimateDomain)) {
+                return {
+                    brand: brand,
+                    reason: `Domain contains "${brand}" but is not the official ${brand}.com`
+                };
+            }
+        }
+        
+        // Check for brand in display name but different domain
+        if (displayLower.includes(brand)) {
+            const legitimateDomain = brand + '.com';
+            // If display name mentions brand but domain is different
+            if (!domainLower.includes(brand) && domainLower !== legitimateDomain) {
+                return {
+                    brand: brand,
+                    reason: `Display name mentions "${brand}" but email is from "${domain}"`
+                };
+            }
+        }
+        
+        // Check for lookalike brand domains (1-2 char difference)
+        const distance = levenshteinDistance(domainName, brand);
+        if (distance > 0 && distance <= 2 && domainName.length >= 4) {
+            return {
+                brand: brand,
+                reason: `Domain "${domainName}" looks similar to "${brand}" (${distance} character${distance > 1 ? 's' : ''} different)`
+            };
+        }
+    }
+    
+    return null;
+}
+
 function detectDisplayNameImpersonation(displayName, senderDomain) {
     if (!displayName) return null;
     
@@ -551,7 +688,7 @@ function showError(message) {
     document.body.className = '';
 }
 
-function displayResults(warnings, isFirstTime, senderEmail) {
+function displayResults(warnings, senderEmail) {
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('error').classList.add('hidden');
     document.getElementById('results').classList.remove('hidden');
@@ -578,11 +715,6 @@ function displayResults(warnings, isFirstTime, senderEmail) {
         statusBadge.className = 'status-badge warning';
         statusIcon.textContent = '⚠️';
         statusText.textContent = `${mediumCount} Warning${mediumCount > 1 ? 's' : ''} Detected`;
-    } else if (isFirstTime) {
-        document.body.classList.add('status-info');
-        statusBadge.className = 'status-badge info';
-        statusIcon.textContent = '👤';
-        statusText.textContent = 'First-Time Sender';
     } else {
         document.body.classList.add('status-safe');
         statusBadge.className = 'status-badge safe';
@@ -624,7 +756,9 @@ function displayResults(warnings, isFirstTime, senderEmail) {
                     </div>
                 `;
             } else if (w.senderEmail && w.matchedEmail) {
-                const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : 'Similar to';
+                const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : 
+                                   w.type === 'brand-impersonation' ? 'Impersonating' :
+                                   w.type === 'deceptive-tld' ? 'Deceptive TLD' : 'Similar to';
                 emailHtml = `
                     <div class="warning-emails">
                         <div class="warning-email-row">
@@ -656,7 +790,7 @@ function displayResults(warnings, isFirstTime, senderEmail) {
         if (safeSenderBtn) {
             safeSenderBtn.onclick = () => {
                 knownContacts.add(senderEmail);
-                displayResults([], false, senderEmail);
+                displayResults([], senderEmail);
             };
         }
     } else {
