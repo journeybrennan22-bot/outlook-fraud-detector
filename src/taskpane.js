@@ -96,7 +96,7 @@ const KEYWORD_CATEGORIES = {
     'Sensitive Data Requests': {
         keywords: [
             'social security', 'ssn', 'tax id',
-            'w-9', 'w9', 'ein number',
+            'W-9', 'W9', 'ein number',
             'login credentials', 'password reset',
             'verify your account', 'verify immediately',
             'confirm your identity', 'verify your identity'
