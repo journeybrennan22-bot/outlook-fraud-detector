@@ -620,7 +620,7 @@ function detectDisplayNameImpersonation(displayName, senderDomain) {
     for (const domain of CONFIG.trustedDomains) {
         if (nameLower.includes(domain) && senderDomain !== domain) {
             return {
-                reason: `Display name contains "${domain}" but email is from "${senderDomain}"`,
+                reason: `The display name shows a different email address than the actual sender.`,
                 impersonatedDomain: domain
             };
         }
@@ -633,7 +633,7 @@ function detectDisplayNameImpersonation(displayName, senderDomain) {
         const nameEmail = match[0].toLowerCase();
         if (!nameEmail.includes(senderDomain)) {
             return {
-                reason: `Display name shows "${nameEmail}" but actual sender domain is "${senderDomain}"`,
+                reason: `The display name shows a different email address than the actual sender.`,
                 impersonatedDomain: nameEmail
             };
         }
@@ -847,7 +847,8 @@ function displayResults(warnings, senderEmail) {
                 const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : 
                                    w.type === 'deceptive-tld' ? 'Deceptive TLD' : 
                                    w.type === 'suspicious-domain' ? 'Pattern' :
-                                   w.type === 'display-name-suspicion' ? 'Pattern' : 'Similar to';
+                                   w.type === 'display-name-suspicion' ? 'Pattern' :
+                                   w.type === 'impersonation' ? 'Display name shows' : 'Similar to';
                 emailHtml = `
                     <div class="warning-emails">
                         <div class="warning-email-row">
@@ -884,7 +885,4 @@ function displayResults(warnings, senderEmail) {
         }
     } else {
         warningsSection.classList.add('hidden');
-        if (warningsFooter) warningsFooter.classList.add('hidden');
-        if (safeMessage) safeMessage.classList.remove('hidden');
-    }
-}
+        if (warningsFooter) warningsFooter.classList.add('
