@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.0.0 - Pattern-based detection (catches ALL impersonation)
+// Version 3.1.0 - Contextual keyword explanations
 
 // ============================================
 // CONFIGURATION
@@ -40,60 +40,106 @@ const DECEPTIVE_TLDS = [
     '.co', '.cm', '.cc', '.ru', '.cn', '.tk', '.ml', '.ga', '.cf'
 ];
 
-// Fraud keywords
-const WIRE_FRAUD_KEYWORDS = [
-    // Wire/Money Movement
-    'wire transfer', 'wire instructions', 'wiring instructions',
-    'wire information', 'wire details', 'updated wire',
-    'new wire', 'wire account', 'wire funds',
-    'ach transfer', 'direct deposit',
-    'zelle', 'venmo', 'cryptocurrency', 'bitcoin',
-    'send funds', 'transfer funds', 'remit funds',
-    
-    // Bank/Account Info
-    'bank account', 'account number', 'routing number',
-    'aba number', 'swift code', 'iban',
-    'bank statement', 'voided check', 'beneficiary',
-    
-    // Account Changes (red flag)
-    'updated bank', 'new bank', 'changed bank',
-    'updated payment', 'new payment info',
-    'changed account', 'new account details',
-    'payment update', 'revised instructions',
-    'please update your records',
-    
-    // Real Estate / Escrow
-    'closing funds', 'earnest money', 'escrow funds',
-    'wire to', 'remittance', 'wire payment',
-    
-    // Legal / Attorney
-    'settlement funds', 'settlement payment',
-    'retainer', 'trust account', 'iolta',
-    'client funds', 'case settlement',
-    'court filing fee', 'legal fee',
-    
-    // Secrecy Red Flags
-    'keep this confidential', 'keep this quiet',
-    'dont mention this', 'between us',
-    'dont tell anyone', 'private matter',
-    'off the record', 'handle personally',
-    
-    // Sensitive Data Requests
-    'social security', 'ssn', 'tax id',
-    'w-9', 'w9', 'ein number',
-    'login credentials', 'password reset',
-    
-    // Authority Impersonation
-    'ceo request', 'cfo request', 'owner request',
-    'boss asked', 'executive request', 'president asked',
-    
-    // Urgency Phrases
-    'verify your account', 'verify immediately', 'act now',
-    'urgent action required', 'account suspended', 'account will be closed',
-    'unusual activity', 'suspicious activity', 'unauthorized access',
-    'confirm your identity', 'verify your identity',
-    'action required within', 'expires today', 'last chance'
-];
+// ============================================
+// KEYWORD CATEGORIES WITH EXPLANATIONS
+// ============================================
+const KEYWORD_CATEGORIES = {
+    'Wire & Payment Methods': {
+        keywords: [
+            'wire transfer', 'wire instructions', 'wiring instructions',
+            'wire information', 'wire details', 'updated wire',
+            'new wire', 'wire account', 'wire funds',
+            'ach transfer', 'direct deposit',
+            'zelle', 'venmo', 'cryptocurrency', 'bitcoin',
+            'send funds', 'transfer funds', 'remit funds',
+            'wire to', 'remittance', 'wire payment'
+        ],
+        explanation: 'Emails requesting money transfers are prime targets for fraud. Always verify payment requests by calling a known number before sending funds.'
+    },
+    'Banking Details': {
+        keywords: [
+            'bank account', 'account number', 'routing number',
+            'aba number', 'swift code', 'iban',
+            'bank statement', 'voided check', 'beneficiary'
+        ],
+        explanation: 'Requests for banking information via email are risky. Scammers use this data to redirect payments or steal funds.'
+    },
+    'Account Changes': {
+        keywords: [
+            'updated bank', 'new bank', 'changed bank',
+            'updated payment', 'new payment info',
+            'changed account', 'new account details',
+            'payment update', 'revised instructions',
+            'please update your records'
+        ],
+        explanation: 'Last-minute changes to payment details are the #1 sign of wire fraud. Always verify changes by phone before proceeding.'
+    },
+    'Real Estate & Legal': {
+        keywords: [
+            'closing funds', 'earnest money', 'escrow funds',
+            'settlement funds', 'settlement payment',
+            'retainer', 'trust account', 'iolta',
+            'client funds', 'case settlement',
+            'court filing fee', 'legal fee'
+        ],
+        explanation: 'Real estate and legal transactions are heavily targeted by scammers. Verify all payment instructions directly with your escrow officer or attorney.'
+    },
+    'Secrecy Tactics': {
+        keywords: [
+            'keep this confidential', 'keep this quiet',
+            'dont mention this', 'between us',
+            'dont tell anyone', 'private matter',
+            'off the record', 'handle personally'
+        ],
+        explanation: 'Requests for secrecy are a major red flag. Legitimate transactions don\'t require you to bypass normal verification procedures.'
+    },
+    'Sensitive Data Requests': {
+        keywords: [
+            'social security', 'ssn', 'tax id',
+            'w-9', 'w9', 'ein number',
+            'login credentials', 'password reset',
+            'verify your account', 'verify immediately',
+            'confirm your identity', 'verify your identity'
+        ],
+        explanation: 'Requests for sensitive personal information via email may be phishing attempts. Verify the request through a known phone number.'
+    },
+    'Authority Impersonation': {
+        keywords: [
+            'ceo request', 'cfo request', 'owner request',
+            'boss asked', 'executive request', 'president asked'
+        ],
+        explanation: 'Scammers impersonate executives to pressure urgent payments. Verify any unusual requests directly with the person through a known channel.'
+    },
+    'Urgency Tactics': {
+        keywords: [
+            'act now', 'urgent action required',
+            'account suspended', 'account will be closed',
+            'unusual activity', 'suspicious activity', 'unauthorized access',
+            'action required within', 'expires today', 'last chance'
+        ],
+        explanation: 'False urgency is a common fraud tactic designed to prevent you from verifying details. Legitimate requests allow time to confirm.'
+    }
+};
+
+// Build flat keyword list for detection
+const WIRE_FRAUD_KEYWORDS = Object.values(KEYWORD_CATEGORIES).flatMap(cat => cat.keywords);
+
+// Helper function to get explanation for a keyword
+function getKeywordExplanation(keyword) {
+    const lowerKeyword = keyword.toLowerCase();
+    for (const [category, data] of Object.entries(KEYWORD_CATEGORIES)) {
+        if (data.keywords.some(k => k.toLowerCase() === lowerKeyword)) {
+            return {
+                category: category,
+                explanation: data.explanation
+            };
+        }
+    }
+    return {
+        category: 'Suspicious Content',
+        explanation: 'This email contains terms that may indicate fraud. Verify any requests through a known phone number.'
+    };
+}
 
 // Homoglyph characters (Cyrillic only)
 const HOMOGLYPHS = {
@@ -423,16 +469,19 @@ function performAnalysis(emailData) {
         });
     }
     
-    // 8. Fraud Keywords
+    // 8. Fraud Keywords - now with contextual explanations
     const wireKeywords = detectWireFraudKeywords(fullContent);
     if (wireKeywords.length > 0) {
+        const keywordInfo = getKeywordExplanation(wireKeywords[0]);
         warnings.push({
             type: 'wire-fraud',
             severity: 'critical',
             title: 'Dangerous Keywords Detected',
             description: 'This email contains terms commonly used in wire fraud.',
             keywords: wireKeywords,
-            isWireFraud: true
+            isWireFraud: true,
+            keywordCategory: keywordInfo.category,
+            keywordExplanation: keywordInfo.explanation
         });
     }
     
@@ -791,7 +840,7 @@ function displayResults(warnings, senderEmail) {
                         <div class="warning-keywords">${keywordTags}</div>
                     </div>
                     <div class="warning-advice">
-                        <strong>Be careful:</strong> Verify this email is legitimate before clicking links, downloading attachments, or taking any action.
+                        <strong>Why this matters:</strong> ${w.keywordExplanation}
                     </div>
                 `;
             } else if (w.senderEmail && w.matchedEmail) {
