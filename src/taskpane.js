@@ -786,7 +786,10 @@ function displayResults(warnings, senderEmail) {
                     `<span class="keyword-tag">${k}</span>`
                 ).join('');
                 emailHtml = `
-                    <div class="warning-keywords">${keywordTags}</div>
+                    <div class="warning-keywords-section">
+                        <div class="warning-keywords-label">Triggered by:</div>
+                        <div class="warning-keywords">${keywordTags}</div>
+                    </div>
                     <div class="warning-advice">
                         <strong>Be careful:</strong> Verify this email is legitimate before clicking links, downloading attachments, or taking any action.
                     </div>
