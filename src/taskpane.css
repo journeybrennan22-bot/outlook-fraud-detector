@@ -167,6 +167,47 @@ body.status-safe {
     line-height: 1.5;
 }
 
+/* Keyword Tags Section */
+.warning-keywords-section {
+    margin: 16px 0;
+    text-align: center;
+}
+
+.warning-keywords-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #605e5c;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.warning-keywords {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+}
+
+.keyword-tag {
+    display: inline-block;
+    padding: 8px 16px;
+    background: #a80000;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 6px;
+}
+
+/* Warning Advice */
+.warning-advice {
+    margin-top: 12px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
 /* Email display in warnings */
 .warning-emails {
     margin-top: 8px;
