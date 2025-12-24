@@ -600,8 +600,8 @@ function detectSuspiciousDisplayName(displayName, senderDomain) {
     }
     
     // Check if display name looks like a company but domain doesn't match
-    // e.g., Display: "Amazon Support" but domain is "customer-amazon.com"
-    const companyPatterns = ['support', 'service', 'team', 'security', 'billing', 'account'];
+    // Only flag truly suspicious words - not common business words like "service", "team", "support"
+    const companyPatterns = ['security', 'billing', 'account', 'verification', 'fraud alert', 'helpdesk'];
     for (const pattern of companyPatterns) {
         if (nameLower.includes(pattern) && isGenericDomain) {
             return {
