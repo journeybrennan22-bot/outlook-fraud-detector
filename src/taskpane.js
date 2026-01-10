@@ -65,7 +65,6 @@ const IMPERSONATION_TARGETS = {
     "us postal service": ["usps.com"],
     
     // Major Banks
-    "chase": ["chase.com"],
     "chase bank": ["chase.com"],
     "jpmorgan": ["jpmorgan.com", "chase.com"],
     "bank of america": ["bankofamerica.com"],
@@ -566,7 +565,8 @@ function performAnalysis(emailData) {
     }
     
     // 10. Organization Impersonation Detection (SSA, IRS, banks, etc.)
-    const orgImpersonation = detectOrganizationImpersonation(displayName, subject, senderDomain);
+    // Skip for trusted domains - no need to check our own company
+    const orgImpersonation = isTrustedDomain(senderDomain) ? null : detectOrganizationImpersonation(displayName, subject, senderDomain);
     if (orgImpersonation) {
         warnings.push({
             type: 'org-impersonation',
