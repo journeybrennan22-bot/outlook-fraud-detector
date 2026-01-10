@@ -15,6 +15,7 @@
             <div class="spinner"></div>
             <p>Analyzing email...</p>
         </div>
+        
         <!-- Results Container -->
         <div id="results" class="results hidden">
             <!-- Status Badge -->
@@ -22,18 +23,21 @@
                 <span class="status-icon"></span>
                 <span class="status-text"></span>
             </div>
-            <!-- Warnings Section -->
+            
+            <!-- Warnings Section - White card extends to bottom -->
             <div id="warnings-section" class="section hidden">
                 <div id="warnings-list" class="warnings-list"></div>
-                <div id="warnings-footer" class="warnings-footer hidden">
+                <div id="warnings-footer" class="warnings-footer">
                     <a href="https://emailfraudalert.com/learn.html" target="_blank" class="learn-btn">Learn how scams work</a>
                 </div>
             </div>
+            
             <!-- Safe State Message -->
-            <div id="safe-message" class="safe-message hidden">
+            <div id="safe-message" class="section safe-message hidden">
                 <p>No warning signs detected in this email.</p>
             </div>
         </div>
+        
         <!-- Error State -->
         <div id="error" class="error hidden">
             <div class="error-icon">❌</div>
