@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.1.0 - Contextual keyword explanations
+// Version 3.2.0 - Organization impersonation detection
 
 // ============================================
 // CONFIGURATION
@@ -39,6 +39,67 @@ const DECEPTIVE_TLDS = [
     '.net.co', '.net.br', '.org.co', '.co.uk.com', '.us.com',
     '.co', '.cm', '.cc', '.ru', '.cn', '.tk', '.ml', '.ga', '.cf'
 ];
+
+// ============================================
+// ORGANIZATION IMPERSONATION TARGETS
+// Maps commonly impersonated entities to their legitimate domains
+// ============================================
+const IMPERSONATION_TARGETS = {
+    // US Government - Federal
+    "social security": ["ssa.gov"],
+    "social security administration": ["ssa.gov"],
+    "internal revenue service": ["irs.gov"],
+    "irs": ["irs.gov"],
+    "treasury department": ["treasury.gov"],
+    "us treasury": ["treasury.gov"],
+    "medicare": ["medicare.gov", "cms.gov"],
+    "medicaid": ["medicaid.gov", "cms.gov"],
+    "veterans affairs": ["va.gov"],
+    "federal trade commission": ["ftc.gov"],
+    "ftc": ["ftc.gov"],
+    "homeland security": ["dhs.gov"],
+    "uscis": ["uscis.gov"],
+    "department of justice": ["justice.gov"],
+    "fbi": ["fbi.gov"],
+    "usps": ["usps.com"],
+    "us postal service": ["usps.com"],
+    
+    // Major Banks
+    "chase": ["chase.com"],
+    "chase bank": ["chase.com"],
+    "jpmorgan": ["jpmorgan.com", "chase.com"],
+    "bank of america": ["bankofamerica.com"],
+    "wells fargo": ["wellsfargo.com"],
+    "citibank": ["citi.com", "citibank.com"],
+    "citi": ["citi.com", "citibank.com"],
+    "us bank": ["usbank.com"],
+    "capital one": ["capitalone.com"],
+    "pnc bank": ["pnc.com"],
+    "td bank": ["td.com", "tdbank.com"],
+    "truist": ["truist.com"],
+    
+    // Payment & Financial Services
+    "paypal": ["paypal.com"],
+    "venmo": ["venmo.com"],
+    "zelle": ["zellepay.com"],
+    "square": ["squareup.com", "square.com"],
+    "stripe": ["stripe.com"],
+    
+    // Title & Escrow (relevant to your industry)
+    "first american title": ["firstam.com"],
+    "fidelity national title": ["fnf.com"],
+    "chicago title": ["ctic.com"],
+    "old republic title": ["oldrepublictitle.com"],
+    "stewart title": ["stewart.com"],
+    
+    // Tech Companies (commonly spoofed)
+    "microsoft": ["microsoft.com"],
+    "apple": ["apple.com"],
+    "google": ["google.com"],
+    "amazon": ["amazon.com"],
+    "netflix": ["netflix.com"],
+    "docusign": ["docusign.com", "docusign.net"]
+};
 
 // ============================================
 // KEYWORD CATEGORIES WITH EXPLANATIONS
@@ -504,12 +565,61 @@ function performAnalysis(emailData) {
         }
     }
     
+    // 10. Organization Impersonation Detection (SSA, IRS, banks, etc.)
+    const orgImpersonation = detectOrganizationImpersonation(displayName, subject, senderDomain);
+    if (orgImpersonation) {
+        warnings.push({
+            type: 'org-impersonation',
+            severity: 'critical',
+            title: 'Organization Impersonation',
+            description: `This email claims to be from ${orgImpersonation.entityClaimed} but is not coming from a legitimate domain.`,
+            senderEmail: senderEmail,
+            matchedEmail: orgImpersonation.legitimateDomains.join(', '),
+            claimedEntity: orgImpersonation.entityClaimed,
+            legitimateDomains: orgImpersonation.legitimateDomains
+        });
+    }
+    
     displayResults(warnings, senderEmail);
 }
 
 // ============================================
 // DETECTION FUNCTIONS
 // ============================================
+
+/**
+ * Detect organization impersonation (e.g., fake SSA, IRS, banks)
+ * Checks if display name or subject claims to be a known entity
+ * but email comes from a non-legitimate domain
+ */
+function detectOrganizationImpersonation(displayName, subject, senderDomain) {
+    const searchText = ((displayName || '') + ' ' + (subject || '')).toLowerCase();
+    const domainLower = senderDomain.toLowerCase();
+    
+    for (const [entity, legitimateDomains] of Object.entries(IMPERSONATION_TARGETS)) {
+        if (searchText.includes(entity)) {
+            // Check if sender domain matches any legitimate domain
+            const isLegitimate = legitimateDomains.some(legit => 
+                domainLower === legit || domainLower.endsWith('.' + legit)
+            );
+            
+            if (!isLegitimate) {
+                // Format entity name for display (capitalize)
+                const formattedEntity = entity.split(' ')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ');
+                
+                return {
+                    entityClaimed: formattedEntity,
+                    senderDomain: senderDomain,
+                    legitimateDomains: legitimateDomains
+                };
+            }
+        }
+    }
+    
+    return null;
+}
 
 /**
  * Detect deceptive TLDs like .com.co, .com.br, etc.
@@ -844,6 +954,23 @@ function displayResults(warnings, senderEmail) {
                     </div>
                     <div class="warning-advice">
                         <strong>Why this matters:</strong> ${w.keywordExplanation}
+                    </div>
+                `;
+            } else if (w.type === 'org-impersonation') {
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Claims to be:</span>
+                            <span class="warning-email-value known">${w.claimedEntity}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Actually from:</span>
+                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Legitimate domains:</span>
+                            <span class="warning-email-value known">${w.matchedEmail}</span>
+                        </div>
                     </div>
                 `;
             } else if (w.senderEmail && w.matchedEmail) {
