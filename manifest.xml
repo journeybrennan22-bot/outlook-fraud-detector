@@ -6,7 +6,7 @@
            xsi:type="MailApp">
   
   <Id>a1b2c3d4-e5f6-7890-abcd-ef1234567890</Id>
-  <Version>3.2.0</Version>
+  <Version>3.2.1</Version>
   <ProviderName>Email Fraud Alert</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Email Fraud Detector"/>
@@ -78,6 +78,7 @@
                     </Icon>
                     <Action xsi:type="ShowTaskpane">
                       <SourceLocation resid="Taskpane.Url"/>
+                      <SupportsPinning>true</SupportsPinning>
                     </Action>
                   </Control>
                 </Group>
