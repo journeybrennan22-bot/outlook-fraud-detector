@@ -662,9 +662,9 @@ function showLoading() {
     const results = document.getElementById('results');
     const error = document.getElementById('error');
     
-    if (loading) loading.style.display = 'block';
-    if (results) results.style.display = 'none';
-    if (error) error.style.display = 'none';
+    if (loading) { loading.classList.remove('hidden'); loading.style.display = 'flex'; }
+    if (results) { results.classList.add('hidden'); results.style.display = 'none'; }
+    if (error) { error.classList.add('hidden'); error.style.display = 'none'; }
 }
 
 function showError(message) {
@@ -673,9 +673,9 @@ function showError(message) {
     const error = document.getElementById('error');
     const errorMessage = document.getElementById('error-message');
     
-    if (loading) loading.style.display = 'none';
-    if (results) results.style.display = 'none';
-    if (error) error.style.display = 'block';
+    if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
+    if (results) { results.classList.add('hidden'); results.style.display = 'none'; }
+    if (error) { error.classList.remove('hidden'); error.style.display = 'flex'; }
     if (errorMessage) errorMessage.textContent = message;
 }
 
@@ -697,10 +697,10 @@ function displayResults(warnings, emailData) {
     const warningsFooter = document.getElementById('warnings-footer');
     const safeMessage = document.getElementById('safe-message');
     
-    // Hide loading and error, show results (using inline styles)
-    if (loading) loading.style.display = 'none';
-    if (error) error.style.display = 'none';
-    if (results) results.style.display = 'block';
+    // Hide loading and error, show results (remove hidden class AND set inline style)
+    if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
+    if (error) { error.classList.add('hidden'); error.style.display = 'none'; }
+    if (results) { results.classList.remove('hidden'); results.style.display = 'flex'; }
     
     if (warnings.length === 0) {
         // SAFE STATE
@@ -714,8 +714,8 @@ function displayResults(warnings, emailData) {
             if (text) text.textContent = 'No threats detected';
         }
         
-        if (warningsSection) warningsSection.style.display = 'none';
-        if (safeMessage) safeMessage.style.display = 'block';
+        if (warningsSection) { warningsSection.classList.add('hidden'); warningsSection.style.display = 'none'; }
+        if (safeMessage) { safeMessage.classList.remove('hidden'); safeMessage.style.display = 'flex'; }
         
     } else {
         // WARNING STATE
@@ -729,9 +729,9 @@ function displayResults(warnings, emailData) {
             if (text) text.textContent = warnings.length + ' Warning' + (warnings.length > 1 ? 's' : '') + ' Detected';
         }
         
-        if (safeMessage) safeMessage.style.display = 'none';
-        if (warningsSection) warningsSection.style.display = 'block';
-        if (warningsFooter) warningsFooter.style.display = 'block';
+        if (safeMessage) { safeMessage.classList.add('hidden'); safeMessage.style.display = 'none'; }
+        if (warningsSection) { warningsSection.classList.remove('hidden'); warningsSection.style.display = 'block'; }
+        if (warningsFooter) { warningsFooter.classList.remove('hidden'); warningsFooter.style.display = 'block'; }
         
         // Clear and populate warnings list
         if (warningsList) {
