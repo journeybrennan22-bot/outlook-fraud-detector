@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.2 - Org impersonation checks body too
+// Version 3.2.3 - Fixed tech company false positives
 
 // ============================================
 // CONFIGURATION
@@ -91,12 +91,18 @@ const IMPERSONATION_TARGETS = {
     "old republic title": ["oldrepublictitle.com"],
     "stewart title": ["stewart.com"],
     
-    // Tech Companies (commonly spoofed)
-    "microsoft": ["microsoft.com"],
-    "apple": ["apple.com"],
-    "google": ["google.com"],
-    "amazon": ["amazon.com"],
-    "netflix": ["netflix.com"],
+    // Tech Companies (commonly spoofed) - use specific phrases to avoid false positives
+    "microsoft support": ["microsoft.com"],
+    "microsoft account": ["microsoft.com"],
+    "microsoft security": ["microsoft.com"],
+    "apple support": ["apple.com"],
+    "apple id": ["apple.com"],
+    "google security": ["google.com"],
+    "google account": ["google.com"],
+    "amazon support": ["amazon.com"],
+    "amazon account": ["amazon.com"],
+    "netflix support": ["netflix.com"],
+    "netflix account": ["netflix.com"],
     "docusign": ["docusign.com", "docusign.net"]
 };
 
