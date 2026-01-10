@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.2 - DOM manipulation (no innerHTML for CSP compliance)
+// Version 3.2.3 - Works with existing HTML structure
 
 // ============================================
 // CONFIGURATION
@@ -289,24 +289,21 @@ Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         console.log('[EFA] Office ready, initializing...');
         
-        const scanBtn = document.getElementById('scan-btn');
-        const connectBtn = document.getElementById('connect-btn');
-        
-        if (scanBtn) {
-            scanBtn.onclick = scanCurrentEmail;
-        }
-        if (connectBtn) {
-            connectBtn.onclick = connectToMicrosoft;
+        // Set up retry button
+        const retryBtn = document.getElementById('retry-btn');
+        if (retryBtn) {
+            retryBtn.onclick = scanCurrentEmail;
         }
         
+        // Check for stored token
         const storedToken = localStorage.getItem('msalToken');
         if (storedToken) {
             accessToken = storedToken;
             isAuthenticated = true;
-            updateAuthUI(true);
             fetchContacts();
         }
         
+        // Auto-scan on email change
         Office.context.mailbox.addHandlerAsync(
             Office.EventType.ItemChanged,
             () => {
@@ -316,95 +313,13 @@ Office.onReady((info) => {
             }
         );
         
+        // Initial scan
         if (autoScanEnabled) {
             console.log('[EFA] Auto-scan enabled');
             setTimeout(scanCurrentEmail, 1000);
         }
     }
 });
-
-// ============================================
-// AUTHENTICATION
-// ============================================
-async function connectToMicrosoft() {
-    const btn = document.getElementById('connect-btn');
-    if (btn) {
-        btn.textContent = 'Connecting...';
-        btn.disabled = true;
-    }
-    
-    try {
-        const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
-            `client_id=${CONFIG.clientId}` +
-            `&response_type=token` +
-            `&redirect_uri=${encodeURIComponent(CONFIG.redirectUri)}` +
-            `&scope=${encodeURIComponent(CONFIG.scopes.join(' '))}` +
-            `&response_mode=fragment` +
-            `&prompt=consent`;
-        
-        const popup = window.open(authUrl, 'auth', 'width=500,height=600');
-        
-        const checkPopup = setInterval(() => {
-            try {
-                if (popup.closed) {
-                    clearInterval(checkPopup);
-                    if (btn) {
-                        btn.textContent = '🔗 Connect Microsoft';
-                        btn.disabled = false;
-                    }
-                    return;
-                }
-                
-                const hash = popup.location.hash;
-                if (hash && hash.includes('access_token')) {
-                    clearInterval(checkPopup);
-                    popup.close();
-                    
-                    const params = new URLSearchParams(hash.substring(1));
-                    accessToken = params.get('access_token');
-                    
-                    if (accessToken) {
-                        localStorage.setItem('msalToken', accessToken);
-                        isAuthenticated = true;
-                        updateAuthUI(true);
-                        fetchContacts();
-                    }
-                }
-            } catch (e) {
-                // Cross-origin error
-            }
-        }, 500);
-        
-    } catch (error) {
-        console.error('[EFA] Auth error:', error);
-        if (btn) {
-            btn.textContent = '🔗 Connect Microsoft';
-            btn.disabled = false;
-        }
-        showError('Authentication failed: ' + error.message);
-    }
-}
-
-function updateAuthUI(connected) {
-    const btn = document.getElementById('connect-btn');
-    const status = document.getElementById('auth-status');
-    
-    if (connected) {
-        if (btn) {
-            btn.textContent = '✓ Connected';
-            btn.disabled = true;
-            btn.style.background = '#4CAF50';
-        }
-        if (status) status.textContent = 'Connected to Microsoft Graph';
-    } else {
-        if (btn) {
-            btn.textContent = '🔗 Connect Microsoft';
-            btn.disabled = false;
-            btn.style.background = '';
-        }
-        if (status) status.textContent = '';
-    }
-}
 
 // ============================================
 // CONTACTS
@@ -444,7 +359,6 @@ async function fetchContacts() {
             localStorage.removeItem('msalToken');
             isAuthenticated = false;
             accessToken = null;
-            updateAuthUI(false);
         }
     } catch (error) {
         console.error('[EFA] Error fetching contacts:', error);
@@ -740,220 +654,199 @@ function performAnalysis(emailData) {
 }
 
 // ============================================
-// UI FUNCTIONS (DOM manipulation - no innerHTML)
+// UI FUNCTIONS - Works with existing HTML structure
 // ============================================
+
+function showLoading() {
+    const loading = document.getElementById('loading');
+    const results = document.getElementById('results');
+    const error = document.getElementById('error');
+    
+    if (loading) loading.classList.remove('hidden');
+    if (results) results.classList.add('hidden');
+    if (error) error.classList.add('hidden');
+}
+
+function showError(message) {
+    const loading = document.getElementById('loading');
+    const results = document.getElementById('results');
+    const error = document.getElementById('error');
+    const errorMessage = document.getElementById('error-message');
+    
+    if (loading) loading.classList.add('hidden');
+    if (results) results.classList.add('hidden');
+    if (error) error.classList.remove('hidden');
+    if (errorMessage) errorMessage.textContent = message;
+}
+
 function clearElement(el) {
     while (el.firstChild) {
         el.removeChild(el.firstChild);
     }
 }
 
-function showLoading() {
-    const results = document.getElementById('results');
-    if (results) {
-        clearElement(results);
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'loading';
-        loadingDiv.textContent = 'Analyzing email...';
-        results.appendChild(loadingDiv);
-    }
-}
-
-function showError(message) {
-    const results = document.getElementById('results');
-    if (results) {
-        clearElement(results);
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error';
-        errorDiv.textContent = 'Error: ' + message;
-        results.appendChild(errorDiv);
-    }
-}
-
 function displayResults(warnings, emailData) {
     console.log('[EFA] Displaying results...');
     
+    const loading = document.getElementById('loading');
     const results = document.getElementById('results');
-    if (!results) {
-        console.error('[EFA] Results element not found');
-        return;
-    }
+    const error = document.getElementById('error');
+    const statusBadge = document.getElementById('status-badge');
+    const warningsSection = document.getElementById('warnings-section');
+    const warningsList = document.getElementById('warnings-list');
+    const warningsFooter = document.getElementById('warnings-footer');
+    const safeMessage = document.getElementById('safe-message');
     
-    clearElement(results);
+    // Hide loading and error, show results
+    if (loading) loading.classList.add('hidden');
+    if (error) error.classList.add('hidden');
+    if (results) results.classList.remove('hidden');
     
     if (warnings.length === 0) {
-        // Safe banner
-        const safeBanner = document.createElement('div');
-        safeBanner.className = 'safe-banner';
+        // SAFE STATE
+        console.log('[EFA] Showing safe state');
         
-        const safeIcon = document.createElement('div');
-        safeIcon.className = 'safe-icon';
-        safeIcon.textContent = '✓';
-        safeBanner.appendChild(safeIcon);
-        
-        const safeText = document.createElement('div');
-        safeText.className = 'safe-text';
-        safeText.textContent = 'No threats detected';
-        safeBanner.appendChild(safeText);
-        
-        results.appendChild(safeBanner);
-        
-        // Sender info
-        const senderInfo = document.createElement('div');
-        senderInfo.className = 'sender-info';
-        
-        const fromLabel = document.createElement('strong');
-        fromLabel.textContent = 'From: ';
-        senderInfo.appendChild(fromLabel);
-        senderInfo.appendChild(document.createTextNode(emailData.from.displayName || 'Unknown'));
-        senderInfo.appendChild(document.createElement('br'));
-        
-        const emailLabel = document.createElement('strong');
-        emailLabel.textContent = 'Email: ';
-        senderInfo.appendChild(emailLabel);
-        senderInfo.appendChild(document.createTextNode(emailData.from.emailAddress || 'Unknown'));
-        
-        results.appendChild(senderInfo);
-        
-        console.log('[EFA] Safe results displayed');
-        return;
-    }
-    
-    // Warning header
-    const warningHeader = document.createElement('div');
-    warningHeader.className = 'warning-header';
-    
-    const warningIcon = document.createElement('div');
-    warningIcon.className = 'warning-icon';
-    warningIcon.textContent = '🚨';
-    warningHeader.appendChild(warningIcon);
-    
-    const warningCount = document.createElement('div');
-    warningCount.className = 'warning-count';
-    warningCount.textContent = warnings.length + ' Warning' + (warnings.length > 1 ? 's' : '') + ' Detected';
-    warningHeader.appendChild(warningCount);
-    
-    results.appendChild(warningHeader);
-    
-    // Individual warnings
-    for (const warning of warnings) {
-        const warningItem = document.createElement('div');
-        warningItem.className = 'warning-item ' + warning.severity;
-        
-        const warningTitle = document.createElement('div');
-        warningTitle.className = 'warning-title';
-        warningTitle.textContent = warning.title;
-        warningItem.appendChild(warningTitle);
-        
-        const warningDesc = document.createElement('div');
-        warningDesc.className = 'warning-description';
-        warningDesc.textContent = warning.description;
-        warningItem.appendChild(warningDesc);
-        
-        if (warning.type === 'wire-fraud' && warning.keywords) {
-            const keywordsDiv = document.createElement('div');
-            keywordsDiv.className = 'warning-keywords';
-            
-            const keywordLabel = document.createElement('span');
-            keywordLabel.className = 'keyword-label';
-            keywordLabel.textContent = 'TRIGGERED BY: ';
-            keywordsDiv.appendChild(keywordLabel);
-            
-            for (const kw of warning.keywords.slice(0, 5)) {
-                const keywordTag = document.createElement('span');
-                keywordTag.className = 'keyword-tag';
-                keywordTag.textContent = kw;
-                keywordsDiv.appendChild(keywordTag);
-            }
-            
-            warningItem.appendChild(keywordsDiv);
-        } else if (warning.type === 'org-impersonation') {
-            const detailsDiv = document.createElement('div');
-            detailsDiv.className = 'warning-details';
-            
-            // Claims to be
-            const row1 = document.createElement('div');
-            row1.className = 'detail-row';
-            const label1 = document.createElement('span');
-            label1.className = 'detail-label';
-            label1.textContent = 'Claims to be: ';
-            row1.appendChild(label1);
-            const value1 = document.createElement('span');
-            value1.className = 'detail-value entity';
-            value1.textContent = warning.entityClaimed;
-            row1.appendChild(value1);
-            detailsDiv.appendChild(row1);
-            
-            // Actually from
-            const row2 = document.createElement('div');
-            row2.className = 'detail-row';
-            const label2 = document.createElement('span');
-            label2.className = 'detail-label';
-            label2.textContent = 'Actually from: ';
-            row2.appendChild(label2);
-            const value2 = document.createElement('span');
-            value2.className = 'detail-value suspicious';
-            value2.textContent = warning.senderEmail;
-            row2.appendChild(value2);
-            detailsDiv.appendChild(row2);
-            
-            // Legitimate domains
-            const row3 = document.createElement('div');
-            row3.className = 'detail-row';
-            const label3 = document.createElement('span');
-            label3.className = 'detail-label';
-            label3.textContent = 'Legitimate domains: ';
-            row3.appendChild(label3);
-            const value3 = document.createElement('span');
-            value3.className = 'detail-value safe';
-            value3.textContent = warning.matchedEmail;
-            row3.appendChild(value3);
-            detailsDiv.appendChild(row3);
-            
-            warningItem.appendChild(detailsDiv);
-        } else if (warning.senderEmail && warning.matchedEmail) {
-            const detailsDiv = document.createElement('div');
-            detailsDiv.className = 'warning-details';
-            
-            const row1 = document.createElement('div');
-            row1.className = 'detail-row';
-            const label1 = document.createElement('span');
-            label1.className = 'detail-label';
-            label1.textContent = 'From: ';
-            row1.appendChild(label1);
-            const value1 = document.createElement('span');
-            value1.className = 'detail-value suspicious';
-            value1.textContent = warning.senderEmail;
-            row1.appendChild(value1);
-            detailsDiv.appendChild(row1);
-            
-            const row2 = document.createElement('div');
-            row2.className = 'detail-row';
-            const label2 = document.createElement('span');
-            label2.className = 'detail-label';
-            label2.textContent = 'Expected: ';
-            row2.appendChild(label2);
-            const value2 = document.createElement('span');
-            value2.className = 'detail-value safe';
-            value2.textContent = warning.matchedEmail;
-            row2.appendChild(value2);
-            detailsDiv.appendChild(row2);
-            
-            warningItem.appendChild(detailsDiv);
+        if (statusBadge) {
+            const icon = statusBadge.querySelector('.status-icon');
+            const text = statusBadge.querySelector('.status-text');
+            statusBadge.className = 'status-badge safe';
+            if (icon) icon.textContent = '✓';
+            if (text) text.textContent = 'No threats detected';
         }
         
-        results.appendChild(warningItem);
+        if (warningsSection) warningsSection.classList.add('hidden');
+        if (safeMessage) safeMessage.classList.remove('hidden');
+        
+    } else {
+        // WARNING STATE
+        console.log('[EFA] Showing warning state');
+        
+        if (statusBadge) {
+            const icon = statusBadge.querySelector('.status-icon');
+            const text = statusBadge.querySelector('.status-text');
+            statusBadge.className = 'status-badge danger';
+            if (icon) icon.textContent = '🚨';
+            if (text) text.textContent = warnings.length + ' Warning' + (warnings.length > 1 ? 's' : '') + ' Detected';
+        }
+        
+        if (safeMessage) safeMessage.classList.add('hidden');
+        if (warningsSection) warningsSection.classList.remove('hidden');
+        if (warningsFooter) warningsFooter.classList.remove('hidden');
+        
+        // Clear and populate warnings list
+        if (warningsList) {
+            clearElement(warningsList);
+            
+            for (const warning of warnings) {
+                const warningItem = document.createElement('div');
+                warningItem.className = 'warning-item ' + warning.severity;
+                
+                const warningTitle = document.createElement('div');
+                warningTitle.className = 'warning-title';
+                warningTitle.textContent = warning.title;
+                warningItem.appendChild(warningTitle);
+                
+                const warningDesc = document.createElement('div');
+                warningDesc.className = 'warning-description';
+                warningDesc.textContent = warning.description;
+                warningItem.appendChild(warningDesc);
+                
+                if (warning.type === 'wire-fraud' && warning.keywords) {
+                    const keywordsDiv = document.createElement('div');
+                    keywordsDiv.className = 'warning-keywords';
+                    
+                    const keywordLabel = document.createElement('span');
+                    keywordLabel.className = 'keyword-label';
+                    keywordLabel.textContent = 'TRIGGERED BY: ';
+                    keywordsDiv.appendChild(keywordLabel);
+                    
+                    for (const kw of warning.keywords.slice(0, 5)) {
+                        const keywordTag = document.createElement('span');
+                        keywordTag.className = 'keyword-tag';
+                        keywordTag.textContent = kw;
+                        keywordsDiv.appendChild(keywordTag);
+                    }
+                    
+                    warningItem.appendChild(keywordsDiv);
+                } else if (warning.type === 'org-impersonation') {
+                    const detailsDiv = document.createElement('div');
+                    detailsDiv.className = 'warning-details';
+                    
+                    // Claims to be
+                    const row1 = document.createElement('div');
+                    row1.className = 'detail-row';
+                    const label1 = document.createElement('span');
+                    label1.className = 'detail-label';
+                    label1.textContent = 'Claims to be: ';
+                    row1.appendChild(label1);
+                    const value1 = document.createElement('span');
+                    value1.className = 'detail-value entity';
+                    value1.textContent = warning.entityClaimed;
+                    row1.appendChild(value1);
+                    detailsDiv.appendChild(row1);
+                    
+                    // Actually from
+                    const row2 = document.createElement('div');
+                    row2.className = 'detail-row';
+                    const label2 = document.createElement('span');
+                    label2.className = 'detail-label';
+                    label2.textContent = 'Actually from: ';
+                    row2.appendChild(label2);
+                    const value2 = document.createElement('span');
+                    value2.className = 'detail-value suspicious';
+                    value2.textContent = warning.senderEmail;
+                    row2.appendChild(value2);
+                    detailsDiv.appendChild(row2);
+                    
+                    // Legitimate domains
+                    const row3 = document.createElement('div');
+                    row3.className = 'detail-row';
+                    const label3 = document.createElement('span');
+                    label3.className = 'detail-label';
+                    label3.textContent = 'Legitimate domains: ';
+                    row3.appendChild(label3);
+                    const value3 = document.createElement('span');
+                    value3.className = 'detail-value safe';
+                    value3.textContent = warning.matchedEmail;
+                    row3.appendChild(value3);
+                    detailsDiv.appendChild(row3);
+                    
+                    warningItem.appendChild(detailsDiv);
+                } else if (warning.senderEmail && warning.matchedEmail) {
+                    const detailsDiv = document.createElement('div');
+                    detailsDiv.className = 'warning-details';
+                    
+                    const row1 = document.createElement('div');
+                    row1.className = 'detail-row';
+                    const label1 = document.createElement('span');
+                    label1.className = 'detail-label';
+                    label1.textContent = 'From: ';
+                    row1.appendChild(label1);
+                    const value1 = document.createElement('span');
+                    value1.className = 'detail-value suspicious';
+                    value1.textContent = warning.senderEmail;
+                    row1.appendChild(value1);
+                    detailsDiv.appendChild(row1);
+                    
+                    const row2 = document.createElement('div');
+                    row2.className = 'detail-row';
+                    const label2 = document.createElement('span');
+                    label2.className = 'detail-label';
+                    label2.textContent = 'Expected: ';
+                    row2.appendChild(label2);
+                    const value2 = document.createElement('span');
+                    value2.className = 'detail-value safe';
+                    value2.textContent = warning.matchedEmail;
+                    row2.appendChild(value2);
+                    detailsDiv.appendChild(row2);
+                    
+                    warningItem.appendChild(detailsDiv);
+                }
+                
+                warningsList.appendChild(warningItem);
+            }
+        }
     }
     
-    // Learn more link
-    const learnMore = document.createElement('div');
-    learnMore.className = 'learn-more';
-    const link = document.createElement('a');
-    link.href = 'https://emailfraudalert.com/learn.html';
-    link.target = '_blank';
-    link.textContent = 'Learn how scams work →';
-    learnMore.appendChild(link);
-    results.appendChild(learnMore);
-    
-    console.log('[EFA] Warning results displayed');
+    console.log('[EFA] Results displayed successfully');
 }
