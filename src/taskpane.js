@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.0 - Organization impersonation detection (FIXED)
+// Version 3.2.1 - Organization impersonation detection
 
 // ============================================
 // CONFIGURATION
@@ -288,8 +288,18 @@ let autoScanEnabled = true;
 // ============================================
 Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
-        document.getElementById('scan-btn').onclick = scanCurrentEmail;
-        document.getElementById('connect-btn').onclick = connectToMicrosoft;
+        console.log('[EFA] Office ready, initializing...');
+        
+        // Set up button handlers
+        const scanBtn = document.getElementById('scan-btn');
+        const connectBtn = document.getElementById('connect-btn');
+        
+        if (scanBtn) {
+            scanBtn.onclick = scanCurrentEmail;
+        }
+        if (connectBtn) {
+            connectBtn.onclick = connectToMicrosoft;
+        }
         
         // Check for stored token
         const storedToken = localStorage.getItem('msalToken');
@@ -312,7 +322,7 @@ Office.onReady((info) => {
         
         // Initial scan
         if (autoScanEnabled) {
-            console.log('Auto-scan enabled');
+            console.log('[EFA] Auto-scan enabled');
             setTimeout(scanCurrentEmail, 1000);
         }
     }
@@ -323,11 +333,12 @@ Office.onReady((info) => {
 // ============================================
 async function connectToMicrosoft() {
     const btn = document.getElementById('connect-btn');
-    btn.textContent = 'Connecting...';
-    btn.disabled = true;
+    if (btn) {
+        btn.textContent = 'Connecting...';
+        btn.disabled = true;
+    }
     
     try {
-        // Use popup auth
         const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
             `client_id=${CONFIG.clientId}` +
             `&response_type=token` +
@@ -338,13 +349,14 @@ async function connectToMicrosoft() {
         
         const popup = window.open(authUrl, 'auth', 'width=500,height=600');
         
-        // Listen for the redirect
         const checkPopup = setInterval(() => {
             try {
                 if (popup.closed) {
                     clearInterval(checkPopup);
-                    btn.textContent = '🔗 Connect Microsoft';
-                    btn.disabled = false;
+                    if (btn) {
+                        btn.textContent = '🔗 Connect Microsoft';
+                        btn.disabled = false;
+                    }
                     return;
                 }
                 
@@ -353,7 +365,6 @@ async function connectToMicrosoft() {
                     clearInterval(checkPopup);
                     popup.close();
                     
-                    // Parse token from hash
                     const params = new URLSearchParams(hash.substring(1));
                     accessToken = params.get('access_token');
                     
@@ -370,9 +381,11 @@ async function connectToMicrosoft() {
         }, 500);
         
     } catch (error) {
-        console.error('Auth error:', error);
-        btn.textContent = '🔗 Connect Microsoft';
-        btn.disabled = false;
+        console.error('[EFA] Auth error:', error);
+        if (btn) {
+            btn.textContent = '🔗 Connect Microsoft';
+            btn.disabled = false;
+        }
         showError('Authentication failed: ' + error.message);
     }
 }
@@ -382,14 +395,18 @@ function updateAuthUI(connected) {
     const status = document.getElementById('auth-status');
     
     if (connected) {
-        btn.textContent = '✓ Connected';
-        btn.disabled = true;
-        btn.style.background = '#4CAF50';
+        if (btn) {
+            btn.textContent = '✓ Connected';
+            btn.disabled = true;
+            btn.style.background = '#4CAF50';
+        }
         if (status) status.textContent = 'Connected to Microsoft Graph';
     } else {
-        btn.textContent = '🔗 Connect Microsoft';
-        btn.disabled = false;
-        btn.style.background = '';
+        if (btn) {
+            btn.textContent = '🔗 Connect Microsoft';
+            btn.disabled = false;
+            btn.style.background = '';
+        }
         if (status) status.textContent = '';
     }
 }
@@ -400,7 +417,7 @@ function updateAuthUI(connected) {
 async function fetchContacts() {
     if (!accessToken) return;
     
-    console.log('Fetching contacts...');
+    console.log('[EFA] Fetching contacts...');
     
     try {
         const response = await fetch('https://graph.microsoft.com/v1.0/me/contacts?$top=500&$select=emailAddresses', {
@@ -423,23 +440,21 @@ async function fetchContacts() {
                 }
             });
             
-            console.log('Fetched', knownContacts.size, 'contacts');
+            console.log('[EFA] Fetched', knownContacts.size, 'contacts');
             
-            // Also add trusted domains
             CONFIG.trustedDomains.forEach(domain => {
                 knownContacts.add(`@${domain}`);
             });
             
-            console.log('Total known contacts:', knownContacts.size);
+            console.log('[EFA] Total known contacts:', knownContacts.size);
         } else if (response.status === 401) {
-            // Token expired
             localStorage.removeItem('msalToken');
             isAuthenticated = false;
             accessToken = null;
             updateAuthUI(false);
         }
     } catch (error) {
-        console.error('Error fetching contacts:', error);
+        console.error('[EFA] Error fetching contacts:', error);
     }
 }
 
@@ -447,50 +462,37 @@ async function fetchContacts() {
 // HELPER FUNCTIONS
 // ============================================
 
-/**
- * Escape special regex characters in a string
- */
 function escapeRegex(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Format entity name for display (capitalize first letters)
- */
 function formatEntityName(name) {
     return name.split(' ').map(word => 
         word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
 }
 
-/**
- * Detect organization impersonation
- * Checks if sender claims to be a known organization but sends from wrong domain
- */
 function detectOrganizationImpersonation(senderEmail, displayName, subject) {
-    const senderDomain = senderEmail.split('@')[1]?.toLowerCase();
+    const senderDomain = senderEmail.split('@')[1];
     if (!senderDomain) return null;
     
-    // Combine display name and subject for searching
-    const searchText = `${displayName} ${subject}`.toLowerCase();
+    const senderDomainLower = senderDomain.toLowerCase();
+    const searchText = `${displayName || ''} ${subject || ''}`.toLowerCase();
     
-    // Check each impersonation target
     for (const [entityName, legitimateDomains] of Object.entries(IMPERSONATION_TARGETS)) {
-        // Use word boundary matching to prevent false positives (e.g., "chase" in "purchase")
         const entityPattern = new RegExp(`\\b${escapeRegex(entityName)}\\b`, 'i');
         
         if (entityPattern.test(searchText)) {
-            // Check if sender domain matches any legitimate domain
             const isLegitimate = legitimateDomains.some(legit => {
-                return senderDomain === legit || senderDomain.endsWith(`.${legit}`);
+                return senderDomainLower === legit || senderDomainLower.endsWith(`.${legit}`);
             });
             
             if (!isLegitimate) {
                 return {
                     entityClaimed: formatEntityName(entityName),
-                    senderDomain: senderDomain,
+                    senderDomain: senderDomainLower,
                     legitimateDomains: legitimateDomains,
-                    message: `Sender claims to be "${formatEntityName(entityName)}" but email comes from ${senderDomain}. Legitimate emails come from: ${legitimateDomains.join(', ')}`
+                    message: `Sender claims to be "${formatEntityName(entityName)}" but email comes from ${senderDomainLower}. Legitimate emails come from: ${legitimateDomains.join(', ')}`
                 };
             }
         }
@@ -499,9 +501,6 @@ function detectOrganizationImpersonation(senderEmail, displayName, subject) {
     return null;
 }
 
-/**
- * Check for deceptive TLD
- */
 function checkDeceptiveTLD(email) {
     const domain = email.split('@')[1];
     if (!domain) return null;
@@ -521,9 +520,6 @@ function checkDeceptiveTLD(email) {
     return null;
 }
 
-/**
- * Calculate Levenshtein distance between two strings
- */
 function levenshteinDistance(a, b) {
     if (a.length === 0) return b.length;
     if (b.length === 0) return a.length;
@@ -555,24 +551,26 @@ function levenshteinDistance(a, b) {
     return matrix[b.length][a.length];
 }
 
-/**
- * Check for lookalike domain
- */
 function checkLookalikeDomain(senderEmail) {
-    const senderDomain = senderEmail.split('@')[1]?.toLowerCase();
+    const senderDomain = senderEmail.split('@')[1];
     if (!senderDomain) return null;
     
+    const senderDomainLower = senderDomain.toLowerCase();
+    
     for (const contact of knownContacts) {
-        if (contact.startsWith('@')) continue; // Skip domain entries
+        if (contact.startsWith('@')) continue;
         
-        const contactDomain = contact.split('@')[1]?.toLowerCase();
-        if (!contactDomain || contactDomain === senderDomain) continue;
+        const contactDomain = contact.split('@')[1];
+        if (!contactDomain) continue;
         
-        const distance = levenshteinDistance(senderDomain, contactDomain);
+        const contactDomainLower = contactDomain.toLowerCase();
+        if (contactDomainLower === senderDomainLower) continue;
+        
+        const distance = levenshteinDistance(senderDomainLower, contactDomainLower);
         if (distance > 0 && distance <= 2) {
             return {
-                senderDomain: senderDomain,
-                similarTo: contactDomain,
+                senderDomain: senderDomainLower,
+                similarTo: contactDomainLower,
                 distance: distance
             };
         }
@@ -585,9 +583,12 @@ function checkLookalikeDomain(senderEmail) {
 // EMAIL SCANNING
 // ============================================
 function scanCurrentEmail() {
+    console.log('[EFA] Scanning email...');
+    
     const item = Office.context.mailbox.item;
     
     if (!item) {
+        console.log('[EFA] No email selected');
         showError('No email selected');
         return;
     }
@@ -596,35 +597,39 @@ function scanCurrentEmail() {
     
     try {
         const from = item.from;
-        const subject = item.subject;
+        const subject = item.subject || '';
         
-        // Get body
+        console.log('[EFA] From:', from);
+        console.log('[EFA] Subject:', subject);
+        
         item.body.getAsync(Office.CoercionType.Text, (bodyResult) => {
-            // Get reply-to if available
-            if (item.internetHeaders) {
+            console.log('[EFA] Body result status:', bodyResult.status);
+            
+            const body = bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '';
+            
+            // Try to get reply-to header
+            if (item.internetHeaders && typeof item.internetHeaders.getAsync === 'function') {
                 item.internetHeaders.getAsync(['Reply-To'], (headerResult) => {
                     let replyTo = null;
-                    if (headerResult.status === Office.AsyncResultStatus.Succeeded) {
-                        const headers = headerResult.value;
-                        if (headers && headers['Reply-To']) {
-                            replyTo = headers['Reply-To'];
-                        }
+                    if (headerResult.status === Office.AsyncResultStatus.Succeeded && headerResult.value) {
+                        replyTo = headerResult.value['Reply-To'] || null;
                     }
                     
                     const emailData = {
                         from: from,
-                        subject: subject || '',
-                        body: bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '',
+                        subject: subject,
+                        body: body,
                         replyTo: replyTo
                     };
                     
                     performAnalysis(emailData);
                 });
             } else {
+                // No internetHeaders support, proceed without reply-to
                 const emailData = {
                     from: from,
-                    subject: subject || '',
-                    body: bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '',
+                    subject: subject,
+                    body: body,
                     replyTo: null
                 };
                 
@@ -632,100 +637,115 @@ function scanCurrentEmail() {
             }
         });
     } catch (error) {
+        console.error('[EFA] Scan error:', error);
         showError(error.message);
     }
 }
 
 function performAnalysis(emailData) {
-    const warnings = [];
+    console.log('[EFA] Performing analysis...');
     
-    const senderEmail = emailData.from.emailAddress.toLowerCase();
-    const senderDomain = senderEmail.split('@')[1] || '';
-    const displayName = emailData.from.displayName || '';
-    const subject = emailData.subject || '';
-    const body = emailData.body || '';
-    const fullContent = (subject + ' ' + body).toLowerCase();
-    
-    // Skip if sender is in known contacts
-    const isKnownContact = knownContacts.has(senderEmail);
-    
-    // 1. Reply-To Mismatch (only flag if different domain)
-    if (emailData.replyTo && emailData.replyTo.toLowerCase() !== senderEmail) {
-        const replyToDomain = emailData.replyTo.toLowerCase().split('@')[1] || '';
-        if (replyToDomain !== senderDomain) {
+    try {
+        const warnings = [];
+        
+        const senderEmail = (emailData.from.emailAddress || '').toLowerCase();
+        const senderDomain = senderEmail.split('@')[1] || '';
+        const displayName = emailData.from.displayName || '';
+        const subject = emailData.subject || '';
+        const body = emailData.body || '';
+        const fullContent = (subject + ' ' + body).toLowerCase();
+        
+        console.log('[EFA] Sender:', senderEmail);
+        console.log('[EFA] Display name:', displayName);
+        
+        const isKnownContact = knownContacts.has(senderEmail);
+        
+        // 1. Reply-To Mismatch
+        if (emailData.replyTo) {
+            const replyToLower = emailData.replyTo.toLowerCase();
+            if (replyToLower !== senderEmail) {
+                const replyToDomain = replyToLower.split('@')[1] || '';
+                if (replyToDomain !== senderDomain) {
+                    warnings.push({
+                        type: 'replyto-mismatch',
+                        severity: 'critical',
+                        title: 'Reply-To Mismatch',
+                        description: 'Replies will go to a different address than the sender.',
+                        senderEmail: senderEmail,
+                        matchedEmail: replyToLower
+                    });
+                }
+            }
+        }
+        
+        // 2. Organization Impersonation Detection
+        const orgImpersonation = detectOrganizationImpersonation(senderEmail, displayName, subject);
+        if (orgImpersonation) {
+            console.log('[EFA] Org impersonation detected:', orgImpersonation);
             warnings.push({
-                type: 'replyto-mismatch',
+                type: 'org-impersonation',
                 severity: 'critical',
-                title: 'Reply-To Mismatch',
-                description: 'Replies will go to a different address than the sender.',
+                title: 'Organization Impersonation',
+                description: orgImpersonation.message,
                 senderEmail: senderEmail,
-                matchedEmail: emailData.replyTo.toLowerCase()
+                matchedEmail: orgImpersonation.legitimateDomains.join(', '),
+                entityClaimed: orgImpersonation.entityClaimed
             });
         }
-    }
-    
-    // 2. Organization Impersonation Detection
-    const orgImpersonation = detectOrganizationImpersonation(senderEmail, displayName, subject);
-    if (orgImpersonation) {
-        warnings.push({
-            type: 'org-impersonation',
-            severity: 'critical',
-            title: 'Organization Impersonation',
-            description: orgImpersonation.message,
-            senderEmail: senderEmail,
-            matchedEmail: orgImpersonation.legitimateDomains.join(', '),
-            entityClaimed: orgImpersonation.entityClaimed
-        });
-    }
-    
-    // 3. Deceptive TLD
-    const deceptiveTLD = checkDeceptiveTLD(senderEmail);
-    if (deceptiveTLD) {
-        warnings.push({
-            type: 'deceptive-tld',
-            severity: 'critical',
-            title: 'Deceptive Domain',
-            description: deceptiveTLD.warning,
-            senderEmail: senderEmail,
-            matchedEmail: deceptiveTLD.fakingAs
-        });
-    }
-    
-    // 4. Lookalike Domain (only if not known contact)
-    if (!isKnownContact) {
-        const lookalike = checkLookalikeDomain(senderEmail);
-        if (lookalike) {
+        
+        // 3. Deceptive TLD
+        const deceptiveTLD = checkDeceptiveTLD(senderEmail);
+        if (deceptiveTLD) {
             warnings.push({
-                type: 'lookalike',
+                type: 'deceptive-tld',
                 severity: 'critical',
-                title: 'Lookalike Domain',
-                description: `Domain "${lookalike.senderDomain}" is similar to "${lookalike.similarTo}"`,
+                title: 'Deceptive Domain',
+                description: deceptiveTLD.warning,
                 senderEmail: senderEmail,
-                matchedEmail: lookalike.similarTo
+                matchedEmail: deceptiveTLD.fakingAs
             });
         }
-    }
-    
-    // 5. Wire Fraud Keywords
-    const foundKeywords = [];
-    for (const keyword of WIRE_FRAUD_KEYWORDS) {
-        if (fullContent.includes(keyword.toLowerCase())) {
-            foundKeywords.push(keyword);
+        
+        // 4. Lookalike Domain
+        if (!isKnownContact) {
+            const lookalike = checkLookalikeDomain(senderEmail);
+            if (lookalike) {
+                warnings.push({
+                    type: 'lookalike',
+                    severity: 'critical',
+                    title: 'Lookalike Domain',
+                    description: `Domain "${lookalike.senderDomain}" is similar to "${lookalike.similarTo}"`,
+                    senderEmail: senderEmail,
+                    matchedEmail: lookalike.similarTo
+                });
+            }
         }
+        
+        // 5. Wire Fraud Keywords
+        const foundKeywords = [];
+        for (const keyword of WIRE_FRAUD_KEYWORDS) {
+            if (fullContent.includes(keyword.toLowerCase())) {
+                foundKeywords.push(keyword);
+            }
+        }
+        
+        if (foundKeywords.length > 0) {
+            warnings.push({
+                type: 'wire-fraud',
+                severity: 'critical',
+                title: 'Dangerous Keywords Detected',
+                description: 'This email contains terms commonly used in wire fraud.',
+                keywords: foundKeywords
+            });
+        }
+        
+        console.log('[EFA] Warnings found:', warnings.length);
+        displayResults(warnings, emailData);
+        
+    } catch (error) {
+        console.error('[EFA] Analysis error:', error);
+        showError('Analysis failed: ' + error.message);
     }
-    
-    if (foundKeywords.length > 0) {
-        warnings.push({
-            type: 'wire-fraud',
-            severity: 'critical',
-            title: 'Dangerous Keywords Detected',
-            description: 'This email contains terms commonly used in wire fraud.',
-            keywords: foundKeywords
-        });
-    }
-    
-    // Display results
-    displayResults(warnings, emailData);
 }
 
 // ============================================
@@ -733,16 +753,26 @@ function performAnalysis(emailData) {
 // ============================================
 function showLoading() {
     const results = document.getElementById('results');
-    results.innerHTML = '<div class="loading">Analyzing email...</div>';
+    if (results) {
+        results.innerHTML = '<div class="loading">Analyzing email...</div>';
+    }
 }
 
 function showError(message) {
     const results = document.getElementById('results');
-    results.innerHTML = `<div class="error">Error: ${message}</div>`;
+    if (results) {
+        results.innerHTML = `<div class="error">Error: ${message}</div>`;
+    }
 }
 
 function displayResults(warnings, emailData) {
+    console.log('[EFA] Displaying results...');
+    
     const results = document.getElementById('results');
+    if (!results) {
+        console.error('[EFA] Results element not found');
+        return;
+    }
     
     if (warnings.length === 0) {
         results.innerHTML = `
@@ -751,14 +781,13 @@ function displayResults(warnings, emailData) {
                 <div class="safe-text">No threats detected</div>
             </div>
             <div class="sender-info">
-                <strong>From:</strong> ${emailData.from.displayName}<br>
-                <strong>Email:</strong> ${emailData.from.emailAddress}
+                <strong>From:</strong> ${emailData.from.displayName || 'Unknown'}<br>
+                <strong>Email:</strong> ${emailData.from.emailAddress || 'Unknown'}
             </div>
         `;
         return;
     }
     
-    // Has warnings
     const warningCount = warnings.length;
     
     let html = `
@@ -803,4 +832,5 @@ function displayResults(warnings, emailData) {
     `;
     
     results.innerHTML = html;
+    console.log('[EFA] Results displayed');
 }
