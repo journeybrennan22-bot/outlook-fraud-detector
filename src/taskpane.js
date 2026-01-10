@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.1 - Organization impersonation detection
+// Version 3.2.2 - DOM manipulation (no innerHTML for CSP compliance)
 
 // ============================================
 // CONFIGURATION
@@ -13,7 +13,6 @@ const CONFIG = {
 
 // ============================================
 // ORGANIZATION IMPERSONATION TARGETS
-// Maps commonly impersonated entities to their legitimate domains
 // ============================================
 const IMPERSONATION_TARGETS = {
     // US Government - Federal
@@ -290,7 +289,6 @@ Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         console.log('[EFA] Office ready, initializing...');
         
-        // Set up button handlers
         const scanBtn = document.getElementById('scan-btn');
         const connectBtn = document.getElementById('connect-btn');
         
@@ -301,7 +299,6 @@ Office.onReady((info) => {
             connectBtn.onclick = connectToMicrosoft;
         }
         
-        // Check for stored token
         const storedToken = localStorage.getItem('msalToken');
         if (storedToken) {
             accessToken = storedToken;
@@ -310,7 +307,6 @@ Office.onReady((info) => {
             fetchContacts();
         }
         
-        // Auto-scan on email change
         Office.context.mailbox.addHandlerAsync(
             Office.EventType.ItemChanged,
             () => {
@@ -320,7 +316,6 @@ Office.onReady((info) => {
             }
         );
         
-        // Initial scan
         if (autoScanEnabled) {
             console.log('[EFA] Auto-scan enabled');
             setTimeout(scanCurrentEmail, 1000);
@@ -376,7 +371,7 @@ async function connectToMicrosoft() {
                     }
                 }
             } catch (e) {
-                // Cross-origin error - popup still on Microsoft domain
+                // Cross-origin error
             }
         }, 500);
         
@@ -445,8 +440,6 @@ async function fetchContacts() {
             CONFIG.trustedDomains.forEach(domain => {
                 knownContacts.add(`@${domain}`);
             });
-            
-            console.log('[EFA] Total known contacts:', knownContacts.size);
         } else if (response.status === 401) {
             localStorage.removeItem('msalToken');
             isAuthenticated = false;
@@ -607,7 +600,6 @@ function scanCurrentEmail() {
             
             const body = bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '';
             
-            // Try to get reply-to header
             if (item.internetHeaders && typeof item.internetHeaders.getAsync === 'function') {
                 item.internetHeaders.getAsync(['Reply-To'], (headerResult) => {
                     let replyTo = null;
@@ -625,7 +617,6 @@ function scanCurrentEmail() {
                     performAnalysis(emailData);
                 });
             } else {
-                // No internetHeaders support, proceed without reply-to
                 const emailData = {
                     from: from,
                     subject: subject,
@@ -749,19 +740,33 @@ function performAnalysis(emailData) {
 }
 
 // ============================================
-// UI FUNCTIONS
+// UI FUNCTIONS (DOM manipulation - no innerHTML)
 // ============================================
+function clearElement(el) {
+    while (el.firstChild) {
+        el.removeChild(el.firstChild);
+    }
+}
+
 function showLoading() {
     const results = document.getElementById('results');
     if (results) {
-        results.innerHTML = '<div class="loading">Analyzing email...</div>';
+        clearElement(results);
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'loading';
+        loadingDiv.textContent = 'Analyzing email...';
+        results.appendChild(loadingDiv);
     }
 }
 
 function showError(message) {
     const results = document.getElementById('results');
     if (results) {
-        results.innerHTML = `<div class="error">Error: ${message}</div>`;
+        clearElement(results);
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error';
+        errorDiv.textContent = 'Error: ' + message;
+        results.appendChild(errorDiv);
     }
 }
 
@@ -774,63 +779,181 @@ function displayResults(warnings, emailData) {
         return;
     }
     
+    clearElement(results);
+    
     if (warnings.length === 0) {
-        results.innerHTML = `
-            <div class="safe-banner">
-                <div class="safe-icon">✓</div>
-                <div class="safe-text">No threats detected</div>
-            </div>
-            <div class="sender-info">
-                <strong>From:</strong> ${emailData.from.displayName || 'Unknown'}<br>
-                <strong>Email:</strong> ${emailData.from.emailAddress || 'Unknown'}
-            </div>
-        `;
+        // Safe banner
+        const safeBanner = document.createElement('div');
+        safeBanner.className = 'safe-banner';
+        
+        const safeIcon = document.createElement('div');
+        safeIcon.className = 'safe-icon';
+        safeIcon.textContent = '✓';
+        safeBanner.appendChild(safeIcon);
+        
+        const safeText = document.createElement('div');
+        safeText.className = 'safe-text';
+        safeText.textContent = 'No threats detected';
+        safeBanner.appendChild(safeText);
+        
+        results.appendChild(safeBanner);
+        
+        // Sender info
+        const senderInfo = document.createElement('div');
+        senderInfo.className = 'sender-info';
+        
+        const fromLabel = document.createElement('strong');
+        fromLabel.textContent = 'From: ';
+        senderInfo.appendChild(fromLabel);
+        senderInfo.appendChild(document.createTextNode(emailData.from.displayName || 'Unknown'));
+        senderInfo.appendChild(document.createElement('br'));
+        
+        const emailLabel = document.createElement('strong');
+        emailLabel.textContent = 'Email: ';
+        senderInfo.appendChild(emailLabel);
+        senderInfo.appendChild(document.createTextNode(emailData.from.emailAddress || 'Unknown'));
+        
+        results.appendChild(senderInfo);
+        
+        console.log('[EFA] Safe results displayed');
         return;
     }
     
-    const warningCount = warnings.length;
+    // Warning header
+    const warningHeader = document.createElement('div');
+    warningHeader.className = 'warning-header';
     
-    let html = `
-        <div class="warning-header">
-            <div class="warning-icon">🚨</div>
-            <div class="warning-count">${warningCount} Warning${warningCount > 1 ? 's' : ''} Detected</div>
-        </div>
-    `;
+    const warningIcon = document.createElement('div');
+    warningIcon.className = 'warning-icon';
+    warningIcon.textContent = '🚨';
+    warningHeader.appendChild(warningIcon);
     
+    const warningCount = document.createElement('div');
+    warningCount.className = 'warning-count';
+    warningCount.textContent = warnings.length + ' Warning' + (warnings.length > 1 ? 's' : '') + ' Detected';
+    warningHeader.appendChild(warningCount);
+    
+    results.appendChild(warningHeader);
+    
+    // Individual warnings
     for (const warning of warnings) {
-        html += `<div class="warning-item ${warning.severity}">`;
-        html += `<div class="warning-title">${warning.title}</div>`;
-        html += `<div class="warning-description">${warning.description}</div>`;
+        const warningItem = document.createElement('div');
+        warningItem.className = 'warning-item ' + warning.severity;
+        
+        const warningTitle = document.createElement('div');
+        warningTitle.className = 'warning-title';
+        warningTitle.textContent = warning.title;
+        warningItem.appendChild(warningTitle);
+        
+        const warningDesc = document.createElement('div');
+        warningDesc.className = 'warning-description';
+        warningDesc.textContent = warning.description;
+        warningItem.appendChild(warningDesc);
         
         if (warning.type === 'wire-fraud' && warning.keywords) {
-            html += `<div class="warning-keywords">`;
-            html += `<span class="keyword-label">TRIGGERED BY:</span>`;
+            const keywordsDiv = document.createElement('div');
+            keywordsDiv.className = 'warning-keywords';
+            
+            const keywordLabel = document.createElement('span');
+            keywordLabel.className = 'keyword-label';
+            keywordLabel.textContent = 'TRIGGERED BY: ';
+            keywordsDiv.appendChild(keywordLabel);
+            
             for (const kw of warning.keywords.slice(0, 5)) {
-                html += `<span class="keyword-tag">${kw}</span>`;
+                const keywordTag = document.createElement('span');
+                keywordTag.className = 'keyword-tag';
+                keywordTag.textContent = kw;
+                keywordsDiv.appendChild(keywordTag);
             }
-            html += `</div>`;
+            
+            warningItem.appendChild(keywordsDiv);
         } else if (warning.type === 'org-impersonation') {
-            html += `<div class="warning-details">`;
-            html += `<div class="detail-row"><span class="detail-label">Claims to be:</span> <span class="detail-value entity">${warning.entityClaimed}</span></div>`;
-            html += `<div class="detail-row"><span class="detail-label">Actually from:</span> <span class="detail-value suspicious">${warning.senderEmail}</span></div>`;
-            html += `<div class="detail-row"><span class="detail-label">Legitimate domains:</span> <span class="detail-value safe">${warning.matchedEmail}</span></div>`;
-            html += `</div>`;
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'warning-details';
+            
+            // Claims to be
+            const row1 = document.createElement('div');
+            row1.className = 'detail-row';
+            const label1 = document.createElement('span');
+            label1.className = 'detail-label';
+            label1.textContent = 'Claims to be: ';
+            row1.appendChild(label1);
+            const value1 = document.createElement('span');
+            value1.className = 'detail-value entity';
+            value1.textContent = warning.entityClaimed;
+            row1.appendChild(value1);
+            detailsDiv.appendChild(row1);
+            
+            // Actually from
+            const row2 = document.createElement('div');
+            row2.className = 'detail-row';
+            const label2 = document.createElement('span');
+            label2.className = 'detail-label';
+            label2.textContent = 'Actually from: ';
+            row2.appendChild(label2);
+            const value2 = document.createElement('span');
+            value2.className = 'detail-value suspicious';
+            value2.textContent = warning.senderEmail;
+            row2.appendChild(value2);
+            detailsDiv.appendChild(row2);
+            
+            // Legitimate domains
+            const row3 = document.createElement('div');
+            row3.className = 'detail-row';
+            const label3 = document.createElement('span');
+            label3.className = 'detail-label';
+            label3.textContent = 'Legitimate domains: ';
+            row3.appendChild(label3);
+            const value3 = document.createElement('span');
+            value3.className = 'detail-value safe';
+            value3.textContent = warning.matchedEmail;
+            row3.appendChild(value3);
+            detailsDiv.appendChild(row3);
+            
+            warningItem.appendChild(detailsDiv);
         } else if (warning.senderEmail && warning.matchedEmail) {
-            html += `<div class="warning-details">`;
-            html += `<div class="detail-row"><span class="detail-label">From:</span> <span class="detail-value suspicious">${warning.senderEmail}</span></div>`;
-            html += `<div class="detail-row"><span class="detail-label">Expected:</span> <span class="detail-value safe">${warning.matchedEmail}</span></div>`;
-            html += `</div>`;
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'warning-details';
+            
+            const row1 = document.createElement('div');
+            row1.className = 'detail-row';
+            const label1 = document.createElement('span');
+            label1.className = 'detail-label';
+            label1.textContent = 'From: ';
+            row1.appendChild(label1);
+            const value1 = document.createElement('span');
+            value1.className = 'detail-value suspicious';
+            value1.textContent = warning.senderEmail;
+            row1.appendChild(value1);
+            detailsDiv.appendChild(row1);
+            
+            const row2 = document.createElement('div');
+            row2.className = 'detail-row';
+            const label2 = document.createElement('span');
+            label2.className = 'detail-label';
+            label2.textContent = 'Expected: ';
+            row2.appendChild(label2);
+            const value2 = document.createElement('span');
+            value2.className = 'detail-value safe';
+            value2.textContent = warning.matchedEmail;
+            row2.appendChild(value2);
+            detailsDiv.appendChild(row2);
+            
+            warningItem.appendChild(detailsDiv);
         }
         
-        html += `</div>`;
+        results.appendChild(warningItem);
     }
     
-    html += `
-        <div class="learn-more">
-            <a href="https://emailfraudalert.com/learn.html" target="_blank">Learn how scams work →</a>
-        </div>
-    `;
+    // Learn more link
+    const learnMore = document.createElement('div');
+    learnMore.className = 'learn-more';
+    const link = document.createElement('a');
+    link.href = 'https://emailfraudalert.com/learn.html';
+    link.target = '_blank';
+    link.textContent = 'Learn how scams work →';
+    learnMore.appendChild(link);
+    results.appendChild(learnMore);
     
-    results.innerHTML = html;
-    console.log('[EFA] Results displayed');
+    console.log('[EFA] Warning results displayed');
 }
