@@ -35,7 +35,7 @@ body.status-safe {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    padding: 16px;
+    padding: 10px;
 }
 
 /* Loading State */
@@ -73,6 +73,8 @@ body.status-safe {
 /* Results Container */
 .results {
     flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Status Badge */
@@ -80,11 +82,12 @@ body.status-safe {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 14px 16px;
+    padding: 10px 12px;
     border-radius: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 10px;
     font-weight: 600;
-    font-size: 16px;
+    font-size: 15px;
+    flex-shrink: 0;
 }
 
 .status-badge.danger {
@@ -112,20 +115,22 @@ body.status-safe {
 }
 
 .status-icon {
-    font-size: 24px;
+    font-size: 18px;
 }
 
 .status-text {
     flex: 1;
 }
 
-/* Section Styles */
+/* Section - White card that extends to bottom */
 .section {
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.95);
     border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 12px;
+    padding: 14px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Warnings */
@@ -139,15 +144,16 @@ body.status-safe {
     padding: 14px;
     border-radius: 6px;
     border-left: 4px solid;
+    background: #fdf3f4;
 }
 
 .warning-item.critical {
-    background: #fde7e9;
+    background: #fdf3f4;
     border-color: #a80000;
 }
 
 .warning-item.medium {
-    background: #fff4ce;
+    background: #fffbf0;
     border-color: #c19c00;
 }
 
@@ -191,12 +197,26 @@ body.status-safe {
 }
 
 .warning-email-value {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     font-family: 'Consolas', 'Courier New', monospace;
-    color: #a80000;
     word-break: break-all;
     display: block;
+}
+
+.warning-email-value.suspicious {
+    color: #a80000;
+}
+
+.warning-email-value.known {
+    color: #107c10;
+}
+
+.warning-reason {
+    font-size: 12px;
+    color: #605e5c;
+    margin-top: 6px;
+    font-style: italic;
 }
 
 /* Keyword tags */
@@ -205,6 +225,7 @@ body.status-safe {
     padding: 10px;
     background: rgba(255, 255, 255, 0.8);
     border-radius: 4px;
+    text-align: center;
 }
 
 .warning-keywords-label {
@@ -219,14 +240,15 @@ body.status-safe {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    justify-content: center;
 }
 
 .keyword-tag {
     background: #a80000;
     color: white;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
     font-weight: 600;
 }
 
@@ -240,32 +262,42 @@ body.status-safe {
     color: #323130;
 }
 
-/* Warnings footer */
+/* Warnings footer - pushes to bottom of white card */
 .warnings-footer {
-    margin-top: 16px;
+    margin-top: auto;
+    padding-top: 16px;
     text-align: center;
 }
 
 .learn-btn {
     display: inline-block;
     padding: 10px 20px;
-    background: #323130;
-    color: white;
+    background: #f5a3aa;
+    color: #323130;
     text-decoration: none;
-    border-radius: 6px;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
+    border-radius: 6px;
+    transition: all 0.2s;
 }
 
 .learn-btn:hover {
-    background: #484644;
+    background: #e8929a;
 }
 
 /* Safe message */
 .safe-message {
     text-align: center;
-    padding: 20px;
-    color: #107c10;
+    padding: 40px 20px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.safe-message p {
+    font-size: 14px;
+    color: #323130;
 }
 
 /* Error State */
@@ -306,14 +338,4 @@ body.status-safe {
 
 .btn-primary:hover {
     background: #106ebe;
-}
-
-.btn-secondary {
-    background: white;
-    color: #323130;
-    border: 1px solid #8a8886;
-}
-
-.btn-secondary:hover {
-    background: #f3f2f1;
 }
