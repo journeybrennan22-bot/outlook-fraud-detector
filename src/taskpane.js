@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.3 - Works with existing HTML structure
+// Version 3.1.0 - Contextual keyword explanations
 
 // ============================================
 // CONFIGURATION
@@ -11,395 +11,709 @@ const CONFIG = {
     trustedDomains: ['baynac.com', 'purelogicescrow.com', 'journeyinsurance.com']
 };
 
+// Suspicious words commonly used in fake domains
+const SUSPICIOUS_DOMAIN_WORDS = [
+    'secure', 'security', 'verify', 'verification', 'login', 'signin', 'signon',
+    'alert', 'alerts', 'support', 'helpdesk', 'service', 'services',
+    'account', 'accounts', 'update', 'confirm', 'confirmation',
+    'billing', 'payment', 'invoice', 'refund', 'claim',
+    'unlock', 'suspended', 'locked', 'verify', 'validate',
+    'official', 'authentic', 'legit', 'real', 'genuine',
+    'team', 'dept', 'department', 'center', 'centre',
+    'online', 'web', 'portal', 'access', 'customer'
+];
+
+// Suspicious display name patterns (suggest impersonation)
+const SUSPICIOUS_DISPLAY_PATTERNS = [
+    'security', 'fraud', 'alert', 'support', 'helpdesk', 'help desk',
+    'customer service', 'account team', 'billing', 'verification',
+    'department', 'official', 'admin', 'administrator',
+    'no-reply', 'noreply', 'do not reply', 'automated',
+    'urgent', 'important', 'action required', 'immediate'
+];
+
+// Deceptive TLDs that look like .com but aren't
+const DECEPTIVE_TLDS = [
+    '.com.co', '.com.br', '.com.mx', '.com.ar', '.com.au', '.com.ng',
+    '.com.pk', '.com.ph', '.com.ua', '.com.ve', '.com.vn', '.com.tr',
+    '.net.co', '.net.br', '.org.co', '.co.uk.com', '.us.com',
+    '.co', '.cm', '.cc', '.ru', '.cn', '.tk', '.ml', '.ga', '.cf'
+];
+
 // ============================================
-// ORGANIZATION IMPERSONATION TARGETS
+// KEYWORD CATEGORIES WITH EXPLANATIONS
 // ============================================
-const IMPERSONATION_TARGETS = {
-    // US Government - Federal
-    "social security": ["ssa.gov"],
-    "social security administration": ["ssa.gov"],
-    "ssa": ["ssa.gov"],
-    "internal revenue service": ["irs.gov"],
-    "irs": ["irs.gov"],
-    "treasury department": ["treasury.gov"],
-    "us treasury": ["treasury.gov"],
-    "department of treasury": ["treasury.gov"],
-    "medicare": ["medicare.gov", "cms.gov"],
-    "medicaid": ["medicaid.gov", "cms.gov"],
-    "cms": ["cms.gov"],
-    "federal bureau of investigation": ["fbi.gov"],
-    "fbi": ["fbi.gov"],
-    "veterans affairs": ["va.gov"],
-    "department of veterans affairs": ["va.gov"],
-    "va benefits": ["va.gov"],
-    "federal trade commission": ["ftc.gov"],
-    "ftc": ["ftc.gov"],
-    "department of homeland security": ["dhs.gov"],
-    "homeland security": ["dhs.gov"],
-    "dhs": ["dhs.gov"],
-    "immigration": ["uscis.gov"],
-    "uscis": ["uscis.gov"],
-    "us citizenship": ["uscis.gov"],
-    "department of justice": ["justice.gov", "usdoj.gov"],
-    "doj": ["justice.gov"],
-    "department of labor": ["dol.gov"],
-    "unemployment benefits": ["dol.gov"],
-    "small business administration": ["sba.gov"],
-    "sba": ["sba.gov"],
-    "sba loan": ["sba.gov"],
-    "federal housing administration": ["hud.gov"],
-    "fha": ["hud.gov"],
-    "hud": ["hud.gov"],
-    "student aid": ["studentaid.gov", "ed.gov"],
-    "fafsa": ["studentaid.gov", "ed.gov"],
-    "department of education": ["ed.gov"],
+const KEYWORD_CATEGORIES = {
+    'Wire & Payment Methods': {
+        keywords: [
+            'wire transfer', 'wire instructions', 'wiring instructions',
+            'wire information', 'wire details', 'updated wire',
+            'new wire', 'wire account', 'wire funds',
+            'ach transfer', 'direct deposit',
+            'zelle', 'venmo', 'cryptocurrency', 'bitcoin',
+            'send funds', 'transfer funds', 'remit funds',
+            'wire to', 'remittance', 'wire payment'
+        ],
+        explanation: 'Emails requesting money transfers are prime targets for fraud. Always verify payment requests by calling a known number before sending funds.'
+    },
+    'Banking Details': {
+        keywords: [
+            'bank account', 'account number', 'routing number',
+            'aba number', 'swift code', 'iban',
+            'bank statement', 'voided check', 'beneficiary'
+        ],
+        explanation: 'Requests for banking information via email are risky. Scammers use this data to redirect payments or steal funds.'
+    },
+    'Account Changes': {
+        keywords: [
+            'updated bank', 'new bank', 'changed bank',
+            'updated payment', 'new payment info',
+            'changed account', 'new account details',
+            'payment update', 'revised instructions',
+            'please update your records'
+        ],
+        explanation: 'Last-minute changes to payment details are the #1 sign of wire fraud. Always verify changes by phone before proceeding.'
+    },
+    'Real Estate & Legal': {
+        keywords: [
+            'closing funds', 'earnest money', 'escrow funds',
+            'settlement funds', 'settlement payment',
+            'retainer', 'trust account', 'iolta',
+            'client funds', 'case settlement',
+            'court filing fee', 'legal fee'
+        ],
+        explanation: 'Real estate and legal transactions are heavily targeted by scammers. Verify all payment instructions directly with your escrow officer or attorney.'
+    },
+    'Secrecy Tactics': {
+        keywords: [
+            'keep this confidential', 'keep this quiet',
+            'dont mention this', 'between us',
+            'dont tell anyone', 'private matter',
+            'off the record', 'handle personally'
+        ],
+        explanation: "Requests for secrecy are a major red flag. Legitimate transactions don't require you to bypass normal verification procedures."
+    },
+    'Sensitive Data Requests': {
+        keywords: [
+            'social security', 'ssn', 'tax id',
+            'W-9', 'W9', 'ein number',
+            'login credentials', 'password reset',
+            'verify your account', 'verify immediately',
+            'confirm your identity', 'verify your identity'
+        ],
+        explanation: 'Requests for sensitive personal information via email may be phishing attempts. Verify the request through a known phone number.'
+    },
+    'Authority Impersonation': {
+        keywords: [
+            'ceo request', 'cfo request', 'owner request',
+            'boss asked', 'executive request', 'president asked'
+        ],
+        explanation: 'Scammers impersonate executives to pressure urgent payments. Verify any unusual requests directly with the person through a known channel.'
+    },
+    'Urgency Tactics': {
+        keywords: [
+            'act now', 'urgent action required',
+            'account suspended', 'account will be closed',
+            'unusual activity', 'suspicious activity', 'unauthorized access',
+            'action required within', 'expires today', 'last chance'
+        ],
+        explanation: 'False urgency is a common fraud tactic designed to prevent you from verifying details. Legitimate requests allow time to confirm.'
+    }
+};
 
-    // Shipping & Postal
-    "usps": ["usps.com"],
-    "postal service": ["usps.com"],
-    "us postal service": ["usps.com"],
-    "united states postal": ["usps.com"],
-    "ups": ["ups.com"],
-    "united parcel service": ["ups.com"],
-    "fedex": ["fedex.com"],
-    "federal express": ["fedex.com"],
-    "dhl": ["dhl.com"],
+// Build flat keyword list for detection
+const WIRE_FRAUD_KEYWORDS = Object.values(KEYWORD_CATEGORIES).flatMap(cat => cat.keywords);
 
-    // Major Banks
-    "wells fargo": ["wellsfargo.com"],
-    "bank of america": ["bankofamerica.com", "bofa.com"],
-    "bofa": ["bankofamerica.com", "bofa.com"],
-    "chase": ["chase.com", "jpmorganchase.com"],
-    "jpmorgan": ["chase.com", "jpmorganchase.com"],
-    "jp morgan": ["chase.com", "jpmorganchase.com"],
-    "citibank": ["citi.com", "citibank.com"],
-    "citi": ["citi.com", "citibank.com"],
-    "citigroup": ["citi.com", "citibank.com"],
-    "us bank": ["usbank.com"],
-    "u.s. bank": ["usbank.com"],
-    "pnc": ["pnc.com"],
-    "pnc bank": ["pnc.com"],
-    "capital one": ["capitalone.com"],
-    "td bank": ["td.com", "tdbank.com"],
-    "truist": ["truist.com"],
-    "regions": ["regions.com"],
-    "regions bank": ["regions.com"],
-    "fifth third": ["53.com"],
-    "fifth third bank": ["53.com"],
-    "huntington bank": ["huntington.com"],
-    "huntington": ["huntington.com"],
-    "ally bank": ["ally.com"],
-    "ally": ["ally.com"],
-    "discover": ["discover.com"],
-    "discover bank": ["discover.com"],
-    "american express": ["americanexpress.com", "amex.com"],
-    "amex": ["americanexpress.com", "amex.com"],
-    "navy federal": ["navyfederal.org"],
-    "navy federal credit union": ["navyfederal.org"],
-    "usaa": ["usaa.com"],
+// Helper function to get explanation for a keyword
+function getKeywordExplanation(keyword) {
+    const lowerKeyword = keyword.toLowerCase();
+    for (const [category, data] of Object.entries(KEYWORD_CATEGORIES)) {
+        if (data.keywords.some(k => k.toLowerCase() === lowerKeyword)) {
+            return {
+                category: category,
+                explanation: data.explanation
+            };
+        }
+    }
+    return {
+        category: 'Suspicious Content',
+        explanation: 'This email contains terms that may indicate fraud. Verify any requests through a known phone number.'
+    };
+}
 
-    // Tech Companies
-    "microsoft": ["microsoft.com", "office.com", "live.com", "outlook.com"],
-    "office 365": ["microsoft.com", "office.com"],
-    "microsoft 365": ["microsoft.com", "office.com"],
-    "outlook": ["microsoft.com", "outlook.com"],
-    "onedrive": ["microsoft.com"],
-    "google": ["google.com", "gmail.com"],
-    "gmail": ["google.com", "gmail.com"],
-    "google drive": ["google.com"],
-    "apple": ["apple.com", "icloud.com"],
-    "icloud": ["apple.com", "icloud.com"],
-    "apple id": ["apple.com"],
-    "itunes": ["apple.com"],
-    "app store": ["apple.com"],
-    "amazon": ["amazon.com", "amazon.co.uk", "amazonaws.com"],
-    "amazon prime": ["amazon.com"],
-    "aws": ["amazon.com", "amazonaws.com"],
-    "meta": ["meta.com", "facebook.com", "fb.com"],
-    "facebook": ["facebook.com", "fb.com", "meta.com"],
-    "instagram": ["instagram.com", "meta.com"],
-    "whatsapp": ["whatsapp.com", "meta.com"],
-    "linkedin": ["linkedin.com"],
-    "twitter": ["twitter.com", "x.com"],
-    "x.com": ["twitter.com", "x.com"],
-    "netflix": ["netflix.com"],
-    "spotify": ["spotify.com"],
-    "zoom": ["zoom.us"],
-    "zoom meeting": ["zoom.us"],
-    "dropbox": ["dropbox.com"],
-
-    // Document Signing / Business Tools
-    "docusign": ["docusign.com", "docusign.net"],
-    "adobe": ["adobe.com"],
-    "adobe sign": ["adobe.com", "adobesign.com"],
-    "acrobat": ["adobe.com"],
-    "intuit": ["intuit.com"],
-    "quickbooks": ["intuit.com", "quickbooks.com"],
-    "turbotax": ["intuit.com", "turbotax.com"],
-    "salesforce": ["salesforce.com"],
-
-    // Payment Platforms
-    "paypal": ["paypal.com"],
-    "venmo": ["venmo.com"],
-    "zelle": ["zellepay.com"],
-    "cash app": ["cash.app", "square.com"],
-    "cashapp": ["cash.app", "square.com"],
-    "square": ["square.com", "squareup.com"],
-    "stripe": ["stripe.com"],
-    "wise": ["wise.com"],
-    "transferwise": ["wise.com"],
-
-    // Telecoms
-    "verizon": ["verizon.com", "verizonwireless.com"],
-    "at&t": ["att.com"],
-    "att": ["att.com"],
-    "t-mobile": ["t-mobile.com"],
-    "tmobile": ["t-mobile.com"],
-    "comcast": ["comcast.com", "xfinity.com"],
-    "xfinity": ["comcast.com", "xfinity.com"],
-    "spectrum": ["spectrum.com", "charter.com"],
-
-    // Credit Bureaus
-    "equifax": ["equifax.com"],
-    "experian": ["experian.com"],
-    "transunion": ["transunion.com"],
-    "credit karma": ["creditkarma.com"],
-
-    // Title & Escrow Companies
-    "fidelity national title": ["fnf.com", "fntg.com"],
-    "fidelity title": ["fnf.com", "fntg.com"],
-    "first american title": ["firstam.com"],
-    "first american": ["firstam.com"],
-    "chicago title": ["chicagotitle.com", "fnf.com"],
-    "stewart title": ["stewart.com"],
-    "old republic title": ["oldrepublictitle.com", "oldrepublic.com"],
-
-    // Mortgage / Lending
-    "fannie mae": ["fanniemae.com"],
-    "freddie mac": ["freddiemac.com"],
-    "rocket mortgage": ["rocketmortgage.com", "quickenloans.com"],
-    "quicken loans": ["rocketmortgage.com", "quickenloans.com"],
-    "united wholesale mortgage": ["uwm.com"],
-    "uwm": ["uwm.com"],
-    "loandepot": ["loandepot.com"],
-    "loan depot": ["loandepot.com"],
-    "better mortgage": ["better.com"],
-
-    // Real Estate Platforms
-    "zillow": ["zillow.com"],
-    "redfin": ["redfin.com"],
-    "realtor.com": ["realtor.com"],
-    "trulia": ["trulia.com"],
-
-    // Crypto / Investment
-    "coinbase": ["coinbase.com"],
-    "robinhood": ["robinhood.com"],
-    "fidelity investments": ["fidelity.com"],
-    "fidelity": ["fidelity.com"],
-    "charles schwab": ["schwab.com"],
-    "schwab": ["schwab.com"],
-    "vanguard": ["vanguard.com"],
-    "e*trade": ["etrade.com"],
-    "etrade": ["etrade.com"],
-    "td ameritrade": ["tdameritrade.com"],
-
-    // E-Commerce / Retail
-    "walmart": ["walmart.com"],
-    "target": ["target.com"],
-    "ebay": ["ebay.com"],
-    "best buy": ["bestbuy.com"],
-    "costco": ["costco.com"],
-
-    // International - UK
-    "hmrc": ["gov.uk"],
-    "nhs": ["nhs.uk"],
-    "dvla": ["gov.uk"],
-    "royal mail": ["royalmail.com"],
-    "barclays": ["barclays.co.uk", "barclays.com"],
-    "hsbc": ["hsbc.co.uk", "hsbc.com"],
-    "lloyds": ["lloydsbank.com"],
-    "natwest": ["natwest.com"],
-
-    // International - Canada
-    "canada revenue agency": ["canada.ca"],
-    "cra": ["canada.ca"],
-    "service canada": ["canada.ca"],
-    "canada post": ["canadapost.ca", "canadapost-postescanada.ca"],
-    "rbc": ["rbc.com", "royalbank.com"],
-    "td canada": ["td.com"],
-    "scotiabank": ["scotiabank.com"],
-    "bmo": ["bmo.com"],
-    "cibc": ["cibc.com"],
-
-    // International - Australia
-    "ato": ["ato.gov.au"],
-    "australian taxation office": ["ato.gov.au"],
-    "centrelink": ["servicesaustralia.gov.au"],
-    "australia post": ["auspost.com.au"],
-    "commbank": ["commbank.com.au"],
-    "commonwealth bank": ["commbank.com.au"],
-    "westpac": ["westpac.com.au"],
-    "anz": ["anz.com.au", "anz.com"],
-    "nab": ["nab.com.au"]
+// Homoglyph characters (Cyrillic only)
+const HOMOGLYPHS = {
+    'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'х': 'x',
+    'і': 'i', 'ј': 'j', 'ѕ': 's', 'ԁ': 'd', 'ɡ': 'g', 'ո': 'n',
+    'ν': 'v', 'ѡ': 'w', 'у': 'y', 'һ': 'h', 'ⅼ': 'l', 'ｍ': 'm',
+    '！': '!', '＠': '@'
 };
 
 // ============================================
-// WIRE FRAUD KEYWORDS
+// STATE
 // ============================================
-const WIRE_FRAUD_KEYWORDS = [
-    'wire transfer', 'wire instructions', 'wiring instructions',
-    'bank account', 'account number', 'routing number',
-    'ach transfer', 'direct deposit', 'beneficiary',
-    'updated bank', 'new bank', 'changed bank',
-    'updated payment', 'new payment info',
-    'closing funds', 'earnest money', 'escrow funds',
-    'settlement funds', 'wire to', 'remittance',
-    'keep this confidential', 'keep this quiet',
-    'dont mention this', 'between us',
-    'social security', 'ssn', 'tax id',
-    'W-9', 'W9', 'ein number',
-    'zelle', 'venmo', 'cryptocurrency', 'bitcoin'
-];
-
-// ============================================
-// DECEPTIVE TLD PATTERNS
-// ============================================
-const DECEPTIVE_TLDS = [
-    { pattern: /\.com\.co$/i, readable: '.com.co (Colombia)', fake: '.com' },
-    { pattern: /\.com\.br$/i, readable: '.com.br (Brazil)', fake: '.com' },
-    { pattern: /\.com\.mx$/i, readable: '.com.mx (Mexico)', fake: '.com' },
-    { pattern: /\.com\.ng$/i, readable: '.com.ng (Nigeria)', fake: '.com' },
-    { pattern: /\.com\.ru$/i, readable: '.com.ru (Russia)', fake: '.com' },
-    { pattern: /\.com\.cn$/i, readable: '.com.cn (China)', fake: '.com' },
-    { pattern: /\.org\.uk$/i, readable: '.org.uk (UK)', fake: '.org' }
-];
-
-// ============================================
-// GLOBAL STATE
-// ============================================
+let msalInstance = null;
 let knownContacts = new Set();
-let isAuthenticated = false;
-let accessToken = null;
-let autoScanEnabled = true;
+let currentUserEmail = null;
+let currentItemId = null;
+let isAutoScanEnabled = true;
 
 // ============================================
 // INITIALIZATION
 // ============================================
 Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
-        console.log('[EFA] Office ready, initializing...');
-        
-        // Set up retry button
-        const retryBtn = document.getElementById('retry-btn');
-        if (retryBtn) {
-            retryBtn.onclick = scanCurrentEmail;
-        }
-        
-        // Check for stored token
-        const storedToken = localStorage.getItem('msalToken');
-        if (storedToken) {
-            accessToken = storedToken;
-            isAuthenticated = true;
-            fetchContacts();
-        }
-        
-        // Auto-scan on email change
-        Office.context.mailbox.addHandlerAsync(
-            Office.EventType.ItemChanged,
-            () => {
-                if (autoScanEnabled) {
-                    setTimeout(scanCurrentEmail, 500);
-                }
-            }
-        );
-        
-        // Initial scan
-        if (autoScanEnabled) {
-            console.log('[EFA] Auto-scan enabled');
-            setTimeout(scanCurrentEmail, 1000);
-        }
+        initializeMsal();
+        setupEventHandlers();
+        analyzeCurrentEmail();
+        setupAutoScan();
     }
 });
 
-// ============================================
-// CONTACTS
-// ============================================
-async function fetchContacts() {
-    if (!accessToken) return;
-    
-    console.log('[EFA] Fetching contacts...');
-    
-    try {
-        const response = await fetch('https://graph.microsoft.com/v1.0/me/contacts?$top=500&$select=emailAddresses', {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            }
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            const contacts = data.value || [];
-            
-            contacts.forEach(contact => {
-                if (contact.emailAddresses) {
-                    contact.emailAddresses.forEach(email => {
-                        if (email.address) {
-                            knownContacts.add(email.address.toLowerCase());
-                        }
-                    });
-                }
-            });
-            
-            console.log('[EFA] Fetched', knownContacts.size, 'contacts');
-            
-            CONFIG.trustedDomains.forEach(domain => {
-                knownContacts.add(`@${domain}`);
-            });
-        } else if (response.status === 401) {
-            localStorage.removeItem('msalToken');
-            isAuthenticated = false;
-            accessToken = null;
+function initializeMsal() {
+    const msalConfig = {
+        auth: {
+            clientId: CONFIG.clientId,
+            redirectUri: CONFIG.redirectUri,
+            authority: 'https://login.microsoftonline.com/common'
+        },
+        cache: {
+            cacheLocation: 'sessionStorage',
+            storeAuthStateInCookie: false
         }
-    } catch (error) {
-        console.error('[EFA] Error fetching contacts:', error);
+    };
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+}
+
+function setupEventHandlers() {
+    document.getElementById('retry-btn').addEventListener('click', analyzeCurrentEmail);
+}
+
+function setupAutoScan() {
+    if (Office.context.mailbox.addHandlerAsync) {
+        Office.context.mailbox.addHandlerAsync(
+            Office.EventType.ItemChanged,
+            onItemChanged,
+            (result) => {
+                if (result.status === Office.AsyncResultStatus.Succeeded) {
+                    console.log('Auto-scan enabled');
+                }
+            }
+        );
+    }
+}
+
+function onItemChanged() {
+    if (isAutoScanEnabled) {
+        analyzeCurrentEmail();
     }
 }
 
 // ============================================
-// HELPER FUNCTIONS
+// AUTHENTICATION & DATA FETCHING
 // ============================================
-
-function escapeRegex(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+async function getAccessToken() {
+    if (!msalInstance) return null;
+    
+    const accounts = msalInstance.getAllAccounts();
+    
+    try {
+        if (accounts.length > 0) {
+            const response = await msalInstance.acquireTokenSilent({
+                scopes: CONFIG.scopes,
+                account: accounts[0]
+            });
+            return response.accessToken;
+        } else {
+            const response = await msalInstance.acquireTokenPopup({
+                scopes: CONFIG.scopes
+            });
+            return response.accessToken;
+        }
+    } catch (error) {
+        console.log('Auth error:', error);
+        return null;
+    }
 }
 
-function formatEntityName(name) {
-    return name.split(' ').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
-}
-
-function detectOrganizationImpersonation(senderEmail, displayName, subject) {
-    const senderDomain = senderEmail.split('@')[1];
-    if (!senderDomain) return null;
+/**
+ * Fetch contacts from Microsoft Graph (contacts only - fast)
+ */
+async function fetchContacts(token) {
+    const contacts = [];
     
-    const senderDomainLower = senderDomain.toLowerCase();
-    const searchText = `${displayName || ''} ${subject || ''}`.toLowerCase();
-    
-    for (const [entityName, legitimateDomains] of Object.entries(IMPERSONATION_TARGETS)) {
-        const entityPattern = new RegExp(`\\b${escapeRegex(entityName)}\\b`, 'i');
+    try {
+        let url = 'https://graph.microsoft.com/v1.0/me/contacts?$top=500&$select=emailAddresses';
         
-        if (entityPattern.test(searchText)) {
-            const isLegitimate = legitimateDomains.some(legit => {
-                return senderDomainLower === legit || senderDomainLower.endsWith(`.${legit}`);
+        while (url) {
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             
-            if (!isLegitimate) {
+            if (!response.ok) break;
+            
+            const data = await response.json();
+            
+            if (data.value) {
+                data.value.forEach(contact => {
+                    if (contact.emailAddresses) {
+                        contact.emailAddresses.forEach(email => {
+                            if (email.address) {
+                                contacts.push(email.address.toLowerCase());
+                            }
+                        });
+                    }
+                });
+            }
+            
+            url = data['@odata.nextLink'] || null;
+        }
+        
+        console.log('Fetched', contacts.length, 'contacts');
+    } catch (error) {
+        console.log('Contacts fetch error:', error);
+    }
+    
+    return contacts;
+}
+
+/**
+ * Fetch contacts and add current user email
+ */
+async function fetchAllKnownContacts() {
+    const token = await getAccessToken();
+    if (!token) return;
+    
+    console.log('Fetching contacts...');
+    
+    const contacts = await fetchContacts(token);
+    
+    // Add all to the knownContacts set
+    contacts.forEach(e => knownContacts.add(e));
+    
+    // Add current user's email so lookalikes of their own address are detected
+    if (currentUserEmail) {
+        knownContacts.add(currentUserEmail.toLowerCase());
+    }
+    
+    console.log('Total known contacts:', knownContacts.size);
+}
+
+// ============================================
+// MAIN ANALYSIS
+// ============================================
+async function analyzeCurrentEmail() {
+    showLoading();
+    
+    try {
+        // Get current user email
+        currentUserEmail = Office.context.mailbox.userProfile.emailAddress;
+        
+        // Fetch contacts if not already loaded
+        if (knownContacts.size === 0) {
+            await fetchAllKnownContacts();
+        }
+        
+        // Get email data
+        const item = Office.context.mailbox.item;
+        const from = item.from;
+        const subject = item.subject;
+        
+        // Get body and headers
+        item.body.getAsync(Office.CoercionType.Text, (bodyResult) => {
+            // Try to get Reply-To from internet headers
+            if (item.getAllInternetHeadersAsync) {
+                item.getAllInternetHeadersAsync((headerResult) => {
+                    let replyTo = null;
+                    if (headerResult.status === Office.AsyncResultStatus.Succeeded) {
+                        const headers = headerResult.value;
+                        const replyToMatch = headers.match(/^Reply-To:\s*(.+)$/mi);
+                        if (replyToMatch) {
+                            const emailMatch = replyToMatch[1].match(/<([^>]+)>/) || replyToMatch[1].match(/([^\s,]+@[^\s,]+)/);
+                            if (emailMatch) {
+                                replyTo = emailMatch[1].trim();
+                            }
+                        }
+                    }
+                    
+                    const emailData = {
+                        from: from,
+                        subject: subject || '',
+                        body: bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '',
+                        replyTo: replyTo
+                    };
+                    
+                    performAnalysis(emailData);
+                });
+            } else {
+                const emailData = {
+                    from: from,
+                    subject: subject || '',
+                    body: bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '',
+                    replyTo: null
+                };
+                
+                performAnalysis(emailData);
+            }
+        });
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+function performAnalysis(emailData) {
+    const warnings = [];
+    
+    const senderEmail = emailData.from.emailAddress.toLowerCase();
+    const senderDomain = senderEmail.split('@')[1] || '';
+    const displayName = emailData.from.displayName || '';
+    const subject = emailData.subject || '';
+    const body = emailData.body || '';
+    const fullContent = (subject + ' ' + body).toLowerCase();
+    
+    // Skip if sender is in known contacts
+    const isKnownContact = knownContacts.has(senderEmail);
+    
+    // 1. Reply-To Mismatch (only flag if different domain)
+    if (emailData.replyTo && emailData.replyTo.toLowerCase() !== senderEmail) {
+        const replyToDomain = emailData.replyTo.toLowerCase().split('@')[1] || '';
+        if (replyToDomain !== senderDomain) {
+            warnings.push({
+                type: 'replyto-mismatch',
+                severity: 'critical',
+                title: 'Reply-To Mismatch',
+                description: 'Replies will go to a different address than the sender.',
+                senderEmail: senderEmail,
+                matchedEmail: emailData.replyTo.toLowerCase()
+            });
+        }
+    }
+    
+    // 2. Deceptive TLD Detection
+    const deceptiveTld = detectDeceptiveTLD(senderDomain);
+    if (deceptiveTld) {
+        warnings.push({
+            type: 'deceptive-tld',
+            severity: 'critical',
+            title: 'Deceptive Domain',
+            description: `This domain uses "${deceptiveTld}" which is designed to look like a legitimate .com address.`,
+            senderEmail: senderEmail,
+            matchedEmail: deceptiveTld
+        });
+    }
+    
+    // 3. Suspicious Domain Pattern Detection (NEW - pattern based)
+    const suspiciousDomain = detectSuspiciousDomain(senderDomain);
+    if (suspiciousDomain) {
+        warnings.push({
+            type: 'suspicious-domain',
+            severity: 'critical',
+            title: 'Suspicious Domain',
+            description: suspiciousDomain.reason,
+            senderEmail: senderEmail,
+            matchedEmail: suspiciousDomain.pattern
+        });
+    }
+    
+    // 4. Display Name Suspicion (NEW - pattern based)
+    if (!isKnownContact) {
+        const displaySuspicion = detectSuspiciousDisplayName(displayName, senderDomain);
+        if (displaySuspicion) {
+            warnings.push({
+                type: 'display-name-suspicion',
+                severity: 'critical',
+                title: 'Suspicious Display Name',
+                description: displaySuspicion.reason,
+                senderEmail: senderEmail,
+                matchedEmail: displaySuspicion.pattern
+            });
+        }
+    }
+    
+    // 5. Display Name Impersonation (trusted domains)
+    if (!isKnownContact) {
+        const impersonation = detectDisplayNameImpersonation(displayName, senderDomain);
+        if (impersonation) {
+            warnings.push({
+                type: 'impersonation',
+                severity: 'critical',
+                title: 'Display Name Impersonation',
+                description: impersonation.reason,
+                senderEmail: senderEmail,
+                matchedEmail: impersonation.impersonatedDomain
+            });
+        }
+    }
+    
+    // 6. Homoglyph/Unicode Detection
+    const homoglyph = detectHomoglyphs(senderEmail);
+    if (homoglyph) {
+        warnings.push({
+            type: 'homoglyph',
+            severity: 'critical',
+            title: 'Invisible Character Trick',
+            description: 'This email contains deceptive characters that look identical to normal letters.',
+            senderEmail: senderEmail,
+            matchedEmail: homoglyph,
+            detail: homoglyph
+        });
+    }
+    
+    // 7. Lookalike Domain Detection (your trusted domains)
+    const lookalike = detectLookalikeDomain(senderDomain);
+    if (lookalike) {
+        warnings.push({
+            type: 'lookalike-domain',
+            severity: 'critical',
+            title: 'Lookalike Domain',
+            description: `This domain is similar to ${lookalike.trustedDomain}`,
+            senderEmail: senderEmail,
+            matchedEmail: lookalike.trustedDomain
+        });
+    }
+    
+    // 8. Fraud Keywords - now with contextual explanations
+    const wireKeywords = detectWireFraudKeywords(fullContent);
+    if (wireKeywords.length > 0) {
+        const keywordInfo = getKeywordExplanation(wireKeywords[0]);
+        warnings.push({
+            type: 'wire-fraud',
+            severity: 'critical',
+            title: 'Dangerous Keywords Detected',
+            description: 'This email contains terms commonly used in wire fraud.',
+            keywords: wireKeywords,
+            isWireFraud: true,
+            keywordCategory: keywordInfo.category,
+            keywordExplanation: keywordInfo.explanation
+        });
+    }
+    
+    // 9. Contact Lookalike Detection (skip if known contact)
+    if (!isKnownContact) {
+        const contactLookalike = detectContactLookalike(senderEmail);
+        if (contactLookalike) {
+            warnings.push({
+                type: 'contact-lookalike',
+                severity: 'critical',
+                title: 'Lookalike Email Address',
+                description: 'This email is nearly identical to someone in your contacts, but slightly different.',
+                senderEmail: contactLookalike.incomingEmail,
+                matchedEmail: contactLookalike.matchedContact,
+                reason: contactLookalike.reason
+            });
+        }
+    }
+    
+    displayResults(warnings, senderEmail);
+}
+
+// ============================================
+// DETECTION FUNCTIONS
+// ============================================
+
+/**
+ * Detect deceptive TLDs like .com.co, .com.br, etc.
+ */
+function detectDeceptiveTLD(domain) {
+    const domainLower = domain.toLowerCase();
+    
+    for (const tld of DECEPTIVE_TLDS) {
+        if (domainLower.endsWith(tld)) {
+            return tld;
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Detect suspicious domain patterns (hyphenated domains with security words)
+ */
+function detectSuspiciousDomain(domain) {
+    const domainLower = domain.toLowerCase();
+    const domainName = domainLower.split('.')[0]; // Get name before TLD
+    
+    // Check for hyphenated domains with suspicious words
+    if (domainName.includes('-')) {
+        const parts = domainName.split('-');
+        for (const part of parts) {
+            for (const word of SUSPICIOUS_DOMAIN_WORDS) {
+                if (part === word || part.includes(word)) {
+                    return {
+                        pattern: word,
+                        reason: `Domain contains "-${word}" which is commonly used in phishing attacks`
+                    };
+                }
+            }
+        }
+        
+        // Any hyphenated domain is slightly suspicious
+        return {
+            pattern: 'hyphenated domain',
+            reason: `Hyphenated domains like "${domainName}" are commonly used in phishing. Verify this sender.`
+        };
+    }
+    
+    // Check for suspicious words anywhere in non-hyphenated domain
+    for (const word of SUSPICIOUS_DOMAIN_WORDS) {
+        // Only flag if the word is a suffix (like "chasesecure.com" or "paypalverify.com")
+        if (domainName.endsWith(word) && domainName !== word && domainName.length > word.length + 3) {
+            return {
+                pattern: word,
+                reason: `Domain ends with "${word}" which is commonly used in phishing attacks`
+            };
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Detect suspicious display names that suggest impersonation
+ */
+function detectSuspiciousDisplayName(displayName, senderDomain) {
+    if (!displayName) return null;
+    
+    const nameLower = displayName.toLowerCase();
+    const domainLower = senderDomain.toLowerCase();
+    
+    // List of generic/free email domains
+    const genericDomains = [
+        'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com',
+        'icloud.com', 'mail.com', 'protonmail.com', 'zoho.com', 'yandex.com',
+        'live.com', 'msn.com', 'me.com', 'inbox.com'
+    ];
+    
+    const isGenericDomain = genericDomains.includes(domainLower);
+    
+    // Check for suspicious patterns in display name
+    for (const pattern of SUSPICIOUS_DISPLAY_PATTERNS) {
+        if (nameLower.includes(pattern)) {
+            // If display name has official-sounding words but comes from generic email
+            if (isGenericDomain) {
                 return {
-                    entityClaimed: formatEntityName(entityName),
-                    senderDomain: senderDomainLower,
-                    legitimateDomains: legitimateDomains,
-                    message: `Sender claims to be "${formatEntityName(entityName)}" but email comes from ${senderDomainLower}. Legitimate emails come from: ${legitimateDomains.join(', ')}`
+                    pattern: pattern,
+                    reason: `Display name contains "${pattern}" but email is from ${senderDomain}. Legitimate companies don't use free email services.`
+                };
+            }
+        }
+    }
+    
+    // Check if display name looks like a company but domain doesn't match
+    // Only flag truly suspicious words - not common business words like "service", "team", "support"
+    const companyPatterns = ['security', 'billing', 'account', 'verification', 'fraud alert', 'helpdesk'];
+    for (const pattern of companyPatterns) {
+        if (nameLower.includes(pattern) && isGenericDomain) {
+            return {
+                pattern: pattern,
+                reason: `"${displayName}" sounds official but is from a free email provider (${senderDomain})`
+            };
+        }
+    }
+    
+    return null;
+}
+
+function detectDisplayNameImpersonation(displayName, senderDomain) {
+    if (!displayName) return null;
+    
+    const nameLower = displayName.toLowerCase();
+    
+    // Check if display name contains a trusted domain
+    for (const domain of CONFIG.trustedDomains) {
+        if (nameLower.includes(domain) && senderDomain !== domain) {
+            return {
+                reason: `The display name shows a different email address than the actual sender.`,
+                impersonatedDomain: domain
+            };
+        }
+    }
+    
+    // Check for email-like patterns in display name
+    const emailPattern = /[\w.-]+@[\w.-]+\.\w+/;
+    const match = displayName.match(emailPattern);
+    if (match) {
+        const nameEmail = match[0].toLowerCase();
+        if (!nameEmail.includes(senderDomain)) {
+            return {
+                reason: `The display name shows a different email address than the actual sender.`,
+                impersonatedDomain: nameEmail
+            };
+        }
+    }
+    
+    return null;
+}
+
+function detectHomoglyphs(email) {
+    let found = [];
+    for (const [homoglyph, latin] of Object.entries(HOMOGLYPHS)) {
+        if (email.includes(homoglyph)) {
+            found.push(`"${homoglyph}" looks like "${latin}"`);
+        }
+    }
+    return found.length > 0 ? found.join(', ') : null;
+}
+
+function detectLookalikeDomain(domain) {
+    for (const trusted of CONFIG.trustedDomains) {
+        const distance = levenshteinDistance(domain, trusted);
+        if (distance > 0 && distance <= 2) {
+            return { trustedDomain: trusted, distance: distance };
+        }
+    }
+    return null;
+}
+
+function detectWireFraudKeywords(content) {
+    const found = [];
+    for (const keyword of WIRE_FRAUD_KEYWORDS) {
+        if (content.includes(keyword.toLowerCase())) {
+            found.push(keyword);
+        }
+    }
+    return found;
+}
+
+function detectContactLookalike(incomingEmail) {
+    const incomingParts = parseEmailParts(incomingEmail);
+    if (!incomingParts) return null;
+    
+    const publicDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 
+                           'icloud.com', 'mail.com', 'protonmail.com', 'zoho.com', 'yandex.com'];
+    
+    for (const contactEmail of knownContacts) {
+        if (contactEmail === incomingEmail) continue;
+        
+        const contactParts = parseEmailParts(contactEmail);
+        if (!contactParts) continue;
+        
+        // Calculate username difference
+        const usernameDiff = levenshteinDistance(incomingParts.local, contactParts.local);
+        
+        // Same domain, similar username (1-4 chars different)
+        if (incomingParts.domain === contactParts.domain) {
+            if (usernameDiff > 0 && usernameDiff <= 4) {
+                return {
+                    incomingEmail: incomingEmail,
+                    matchedContact: contactEmail,
+                    reason: `Username is ${usernameDiff} character${usernameDiff > 1 ? 's' : ''} different`
+                };
+            }
+        }
+        
+        // Different domains - check if domain is similar (1-2 chars different)
+        // But skip if both on same public domain with very different usernames
+        const bothPublicSameDomain = publicDomains.includes(incomingParts.domain) && 
+                                      incomingParts.domain === contactParts.domain;
+        
+        if (!bothPublicSameDomain || usernameDiff <= 4) {
+            const domainDistance = levenshteinDistance(incomingParts.domain, contactParts.domain);
+            if (domainDistance > 0 && domainDistance <= 2) {
+                return {
+                    incomingEmail: incomingEmail,
+                    matchedContact: contactEmail,
+                    reason: `Domain is ${domainDistance} character${domainDistance > 1 ? 's' : ''} different`
                 };
             }
         }
@@ -408,23 +722,14 @@ function detectOrganizationImpersonation(senderEmail, displayName, subject) {
     return null;
 }
 
-function checkDeceptiveTLD(email) {
-    const domain = email.split('@')[1];
-    if (!domain) return null;
-    
-    for (const tld of DECEPTIVE_TLDS) {
-        if (tld.pattern.test(domain)) {
-            const fakeDomain = domain.replace(tld.pattern, tld.fake);
-            return {
-                domain: domain,
-                readable: tld.readable,
-                fakingAs: fakeDomain,
-                warning: `Domain "${domain}" looks like "${fakeDomain}" but is registered elsewhere`
-            };
-        }
-    }
-    
-    return null;
+function parseEmailParts(email) {
+    const parts = email.toLowerCase().split('@');
+    if (parts.length !== 2) return null;
+    return { local: parts[0], domain: parts[1], full: email.toLowerCase() };
+}
+
+function isTrustedDomain(domain) {
+    return CONFIG.trustedDomains.includes(domain.toLowerCase());
 }
 
 function levenshteinDistance(a, b) {
@@ -458,395 +763,132 @@ function levenshteinDistance(a, b) {
     return matrix[b.length][a.length];
 }
 
-function checkLookalikeDomain(senderEmail) {
-    const senderDomain = senderEmail.split('@')[1];
-    if (!senderDomain) return null;
-    
-    const senderDomainLower = senderDomain.toLowerCase();
-    
-    for (const contact of knownContacts) {
-        if (contact.startsWith('@')) continue;
-        
-        const contactDomain = contact.split('@')[1];
-        if (!contactDomain) continue;
-        
-        const contactDomainLower = contactDomain.toLowerCase();
-        if (contactDomainLower === senderDomainLower) continue;
-        
-        const distance = levenshteinDistance(senderDomainLower, contactDomainLower);
-        if (distance > 0 && distance <= 2) {
-            return {
-                senderDomain: senderDomainLower,
-                similarTo: contactDomainLower,
-                distance: distance
-            };
-        }
-    }
-    
-    return null;
-}
-
 // ============================================
-// EMAIL SCANNING
+// UI FUNCTIONS
 // ============================================
-function scanCurrentEmail() {
-    console.log('[EFA] Scanning email...');
-    
-    const item = Office.context.mailbox.item;
-    
-    if (!item) {
-        console.log('[EFA] No email selected');
-        showError('No email selected');
-        return;
-    }
-    
-    showLoading();
-    
-    try {
-        const from = item.from;
-        const subject = item.subject || '';
-        
-        console.log('[EFA] From:', from);
-        console.log('[EFA] Subject:', subject);
-        
-        item.body.getAsync(Office.CoercionType.Text, (bodyResult) => {
-            console.log('[EFA] Body result status:', bodyResult.status);
-            
-            const body = bodyResult.status === Office.AsyncResultStatus.Succeeded ? bodyResult.value : '';
-            
-            if (item.internetHeaders && typeof item.internetHeaders.getAsync === 'function') {
-                item.internetHeaders.getAsync(['Reply-To'], (headerResult) => {
-                    let replyTo = null;
-                    if (headerResult.status === Office.AsyncResultStatus.Succeeded && headerResult.value) {
-                        replyTo = headerResult.value['Reply-To'] || null;
-                    }
-                    
-                    const emailData = {
-                        from: from,
-                        subject: subject,
-                        body: body,
-                        replyTo: replyTo
-                    };
-                    
-                    performAnalysis(emailData);
-                });
-            } else {
-                const emailData = {
-                    from: from,
-                    subject: subject,
-                    body: body,
-                    replyTo: null
-                };
-                
-                performAnalysis(emailData);
-            }
-        });
-    } catch (error) {
-        console.error('[EFA] Scan error:', error);
-        showError(error.message);
-    }
-}
-
-function performAnalysis(emailData) {
-    console.log('[EFA] Performing analysis...');
-    
-    try {
-        const warnings = [];
-        
-        const senderEmail = (emailData.from.emailAddress || '').toLowerCase();
-        const senderDomain = senderEmail.split('@')[1] || '';
-        const displayName = emailData.from.displayName || '';
-        const subject = emailData.subject || '';
-        const body = emailData.body || '';
-        const fullContent = (subject + ' ' + body).toLowerCase();
-        
-        console.log('[EFA] Sender:', senderEmail);
-        console.log('[EFA] Display name:', displayName);
-        
-        const isKnownContact = knownContacts.has(senderEmail);
-        
-        // 1. Reply-To Mismatch
-        if (emailData.replyTo) {
-            const replyToLower = emailData.replyTo.toLowerCase();
-            if (replyToLower !== senderEmail) {
-                const replyToDomain = replyToLower.split('@')[1] || '';
-                if (replyToDomain !== senderDomain) {
-                    warnings.push({
-                        type: 'replyto-mismatch',
-                        severity: 'critical',
-                        title: 'Reply-To Mismatch',
-                        description: 'Replies will go to a different address than the sender.',
-                        senderEmail: senderEmail,
-                        matchedEmail: replyToLower
-                    });
-                }
-            }
-        }
-        
-        // 2. Organization Impersonation Detection
-        const orgImpersonation = detectOrganizationImpersonation(senderEmail, displayName, subject);
-        if (orgImpersonation) {
-            console.log('[EFA] Org impersonation detected:', orgImpersonation);
-            warnings.push({
-                type: 'org-impersonation',
-                severity: 'critical',
-                title: 'Organization Impersonation',
-                description: orgImpersonation.message,
-                senderEmail: senderEmail,
-                matchedEmail: orgImpersonation.legitimateDomains.join(', '),
-                entityClaimed: orgImpersonation.entityClaimed
-            });
-        }
-        
-        // 3. Deceptive TLD
-        const deceptiveTLD = checkDeceptiveTLD(senderEmail);
-        if (deceptiveTLD) {
-            warnings.push({
-                type: 'deceptive-tld',
-                severity: 'critical',
-                title: 'Deceptive Domain',
-                description: deceptiveTLD.warning,
-                senderEmail: senderEmail,
-                matchedEmail: deceptiveTLD.fakingAs
-            });
-        }
-        
-        // 4. Lookalike Domain
-        if (!isKnownContact) {
-            const lookalike = checkLookalikeDomain(senderEmail);
-            if (lookalike) {
-                warnings.push({
-                    type: 'lookalike',
-                    severity: 'critical',
-                    title: 'Lookalike Domain',
-                    description: `Domain "${lookalike.senderDomain}" is similar to "${lookalike.similarTo}"`,
-                    senderEmail: senderEmail,
-                    matchedEmail: lookalike.similarTo
-                });
-            }
-        }
-        
-        // 5. Wire Fraud Keywords
-        const foundKeywords = [];
-        for (const keyword of WIRE_FRAUD_KEYWORDS) {
-            if (fullContent.includes(keyword.toLowerCase())) {
-                foundKeywords.push(keyword);
-            }
-        }
-        
-        if (foundKeywords.length > 0) {
-            warnings.push({
-                type: 'wire-fraud',
-                severity: 'critical',
-                title: 'Dangerous Keywords Detected',
-                description: 'This email contains terms commonly used in wire fraud.',
-                keywords: foundKeywords
-            });
-        }
-        
-        console.log('[EFA] Warnings found:', warnings.length);
-        displayResults(warnings, emailData);
-        
-    } catch (error) {
-        console.error('[EFA] Analysis error:', error);
-        showError('Analysis failed: ' + error.message);
-    }
-}
-
-// ============================================
-// UI FUNCTIONS - Works with existing HTML structure
-// ============================================
-
 function showLoading() {
-    const loading = document.getElementById('loading');
-    const results = document.getElementById('results');
-    const error = document.getElementById('error');
-    
-    if (loading) { loading.classList.remove('hidden'); loading.style.display = 'flex'; }
-    if (results) { results.classList.add('hidden'); results.style.display = 'none'; }
-    if (error) { error.classList.add('hidden'); error.style.display = 'none'; }
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('results').classList.add('hidden');
+    document.getElementById('error').classList.add('hidden');
+    document.body.className = '';
 }
 
 function showError(message) {
-    const loading = document.getElementById('loading');
-    const results = document.getElementById('results');
-    const error = document.getElementById('error');
-    const errorMessage = document.getElementById('error-message');
-    
-    if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
-    if (results) { results.classList.add('hidden'); results.style.display = 'none'; }
-    if (error) { error.classList.remove('hidden'); error.style.display = 'flex'; }
-    if (errorMessage) errorMessage.textContent = message;
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('results').classList.add('hidden');
+    document.getElementById('error').classList.remove('hidden');
+    document.getElementById('error-message').textContent = message;
+    document.body.className = '';
 }
 
-function clearElement(el) {
-    while (el.firstChild) {
-        el.removeChild(el.firstChild);
-    }
-}
-
-function displayResults(warnings, emailData) {
-    console.log('[EFA] Displaying results...');
+function displayResults(warnings, senderEmail) {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('error').classList.add('hidden');
+    document.getElementById('results').classList.remove('hidden');
     
-    const loading = document.getElementById('loading');
-    const results = document.getElementById('results');
-    const error = document.getElementById('error');
+    // Count warnings by severity
+    const criticalCount = warnings.filter(w => w.severity === 'critical').length;
+    const mediumCount = warnings.filter(w => w.severity === 'medium').length;
+    
+    // Set body background and status badge
+    document.body.classList.remove('status-critical', 'status-medium', 'status-info', 'status-safe');
+    
     const statusBadge = document.getElementById('status-badge');
+    const statusIcon = statusBadge.querySelector('.status-icon');
+    const statusText = statusBadge.querySelector('.status-text');
+    
+    if (criticalCount > 0 || mediumCount > 0) {
+        const totalWarnings = criticalCount + mediumCount;
+        document.body.classList.add('status-critical');
+        statusBadge.className = 'status-badge danger';
+        statusIcon.textContent = '🚨';
+        statusText.textContent = `${totalWarnings} Warning${totalWarnings > 1 ? 's' : ''} Detected`;
+    } else {
+        document.body.classList.add('status-safe');
+        statusBadge.className = 'status-badge safe';
+        statusIcon.textContent = '✅';
+        statusText.textContent = 'No Issues Detected';
+    }
+    
+    // Display learn link
+    const learnLink = document.getElementById('learn-link');
+    if (learnLink) {
+        if (warnings.length > 0) {
+            learnLink.classList.remove('hidden');
+        } else {
+            learnLink.classList.add('hidden');
+        }
+    }
+    
+    // Display warnings
     const warningsSection = document.getElementById('warnings-section');
     const warningsList = document.getElementById('warnings-list');
     const warningsFooter = document.getElementById('warnings-footer');
     const safeMessage = document.getElementById('safe-message');
     
-    // Hide loading and error, show results (remove hidden class AND set inline style)
-    if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
-    if (error) { error.classList.add('hidden'); error.style.display = 'none'; }
-    if (results) { results.classList.remove('hidden'); results.style.display = 'flex'; }
-    
-    if (warnings.length === 0) {
-        // SAFE STATE
-        console.log('[EFA] Showing safe state');
+    if (warnings.length > 0) {
+        warningsSection.classList.remove('hidden');
+        if (warningsFooter) warningsFooter.classList.remove('hidden');
+        if (safeMessage) safeMessage.classList.add('hidden');
         
-        if (statusBadge) {
-            const icon = statusBadge.querySelector('.status-icon');
-            const text = statusBadge.querySelector('.status-text');
-            statusBadge.className = 'status-badge safe';
-            if (icon) icon.textContent = '✓';
-            if (text) text.textContent = 'No threats detected';
-        }
-        
-        if (warningsSection) { warningsSection.classList.add('hidden'); warningsSection.style.display = 'none'; }
-        if (safeMessage) { safeMessage.classList.remove('hidden'); safeMessage.style.display = 'flex'; }
-        
-    } else {
-        // WARNING STATE
-        console.log('[EFA] Showing warning state');
-        
-        if (statusBadge) {
-            const icon = statusBadge.querySelector('.status-icon');
-            const text = statusBadge.querySelector('.status-text');
-            statusBadge.className = 'status-badge danger';
-            if (icon) icon.textContent = '🚨';
-            if (text) text.textContent = warnings.length + ' Warning' + (warnings.length > 1 ? 's' : '') + ' Detected';
-        }
-        
-        if (safeMessage) { safeMessage.classList.add('hidden'); safeMessage.style.display = 'none'; }
-        if (warningsSection) { warningsSection.classList.remove('hidden'); warningsSection.style.display = 'block'; }
-        if (warningsFooter) { warningsFooter.classList.remove('hidden'); warningsFooter.style.display = 'block'; }
-        
-        // Clear and populate warnings list
-        if (warningsList) {
-            clearElement(warningsList);
-            
-            for (const warning of warnings) {
-                const warningItem = document.createElement('div');
-                warningItem.className = 'warning-item ' + warning.severity;
-                
-                const warningTitle = document.createElement('div');
-                warningTitle.className = 'warning-title';
-                warningTitle.textContent = warning.title;
-                warningItem.appendChild(warningTitle);
-                
-                const warningDesc = document.createElement('div');
-                warningDesc.className = 'warning-description';
-                warningDesc.textContent = warning.description;
-                warningItem.appendChild(warningDesc);
-                
-                if (warning.type === 'wire-fraud' && warning.keywords) {
-                    const keywordsDiv = document.createElement('div');
-                    keywordsDiv.className = 'warning-keywords';
-                    
-                    const keywordLabel = document.createElement('span');
-                    keywordLabel.className = 'keyword-label';
-                    keywordLabel.textContent = 'TRIGGERED BY: ';
-                    keywordsDiv.appendChild(keywordLabel);
-                    
-                    for (const kw of warning.keywords.slice(0, 5)) {
-                        const keywordTag = document.createElement('span');
-                        keywordTag.className = 'keyword-tag';
-                        keywordTag.textContent = kw;
-                        keywordsDiv.appendChild(keywordTag);
-                    }
-                    
-                    warningItem.appendChild(keywordsDiv);
-                } else if (warning.type === 'org-impersonation') {
-                    const detailsDiv = document.createElement('div');
-                    detailsDiv.className = 'warning-details';
-                    
-                    // Claims to be
-                    const row1 = document.createElement('div');
-                    row1.className = 'detail-row';
-                    const label1 = document.createElement('span');
-                    label1.className = 'detail-label';
-                    label1.textContent = 'Claims to be: ';
-                    row1.appendChild(label1);
-                    const value1 = document.createElement('span');
-                    value1.className = 'detail-value entity';
-                    value1.textContent = warning.entityClaimed;
-                    row1.appendChild(value1);
-                    detailsDiv.appendChild(row1);
-                    
-                    // Actually from
-                    const row2 = document.createElement('div');
-                    row2.className = 'detail-row';
-                    const label2 = document.createElement('span');
-                    label2.className = 'detail-label';
-                    label2.textContent = 'Actually from: ';
-                    row2.appendChild(label2);
-                    const value2 = document.createElement('span');
-                    value2.className = 'detail-value suspicious';
-                    value2.textContent = warning.senderEmail;
-                    row2.appendChild(value2);
-                    detailsDiv.appendChild(row2);
-                    
-                    // Legitimate domains
-                    const row3 = document.createElement('div');
-                    row3.className = 'detail-row';
-                    const label3 = document.createElement('span');
-                    label3.className = 'detail-label';
-                    label3.textContent = 'Legitimate domains: ';
-                    row3.appendChild(label3);
-                    const value3 = document.createElement('span');
-                    value3.className = 'detail-value safe';
-                    value3.textContent = warning.matchedEmail;
-                    row3.appendChild(value3);
-                    detailsDiv.appendChild(row3);
-                    
-                    warningItem.appendChild(detailsDiv);
-                } else if (warning.senderEmail && warning.matchedEmail) {
-                    const detailsDiv = document.createElement('div');
-                    detailsDiv.className = 'warning-details';
-                    
-                    const row1 = document.createElement('div');
-                    row1.className = 'detail-row';
-                    const label1 = document.createElement('span');
-                    label1.className = 'detail-label';
-                    label1.textContent = 'From: ';
-                    row1.appendChild(label1);
-                    const value1 = document.createElement('span');
-                    value1.className = 'detail-value suspicious';
-                    value1.textContent = warning.senderEmail;
-                    row1.appendChild(value1);
-                    detailsDiv.appendChild(row1);
-                    
-                    const row2 = document.createElement('div');
-                    row2.className = 'detail-row';
-                    const label2 = document.createElement('span');
-                    label2.className = 'detail-label';
-                    label2.textContent = 'Expected: ';
-                    row2.appendChild(label2);
-                    const value2 = document.createElement('span');
-                    value2.className = 'detail-value safe';
-                    value2.textContent = warning.matchedEmail;
-                    row2.appendChild(value2);
-                    detailsDiv.appendChild(row2);
-                    
-                    warningItem.appendChild(detailsDiv);
-                }
-                
-                warningsList.appendChild(warningItem);
+        warningsList.innerHTML = warnings.map(w => {
+            let emailHtml = '';
+            if (w.isWireFraud && w.keywords) {
+                const keywordTags = w.keywords.slice(0, 5).map(k => 
+                    `<span class="keyword-tag">${k}</span>`
+                ).join('');
+                emailHtml = `
+                    <div class="warning-keywords-section">
+                        <div class="warning-keywords-label">Triggered by:</div>
+                        <div class="warning-keywords">${keywordTags}</div>
+                    </div>
+                    <div class="warning-advice">
+                        <strong>Why this matters:</strong> ${w.keywordExplanation}
+                    </div>
+                `;
+            } else if (w.senderEmail && w.matchedEmail) {
+                const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : 
+                                   w.type === 'deceptive-tld' ? 'Deceptive TLD' : 
+                                   w.type === 'suspicious-domain' ? 'Pattern' :
+                                   w.type === 'display-name-suspicion' ? 'Pattern' :
+                                   w.type === 'impersonation' ? 'Display name shows' : 'Similar to';
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Sender:</span>
+                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">${matchLabel}:</span>
+                            <span class="warning-email-value known">${w.matchedEmail}</span>
+                        </div>
+                        ${w.reason ? `<div class="warning-reason">${w.reason}</div>` : ''}
+                    </div>
+                `;
+            } else if (w.detail) {
+                emailHtml = `<div class="warning-detail">${w.detail}</div>`;
             }
+            
+            return `
+                <div class="warning-item ${w.severity}">
+                    <div class="warning-title">${w.title}</div>
+                    <div class="warning-description">${w.description}</div>
+                    ${emailHtml}
+                </div>
+            `;
+        }).join('');
+        
+        // Setup safe sender button
+        const safeSenderBtn = document.getElementById('safe-sender-btn');
+        if (safeSenderBtn) {
+            safeSenderBtn.onclick = () => {
+                knownContacts.add(senderEmail);
+                displayResults([], senderEmail);
+            };
         }
+    } else {
+        warningsSection.classList.add('hidden');
+        if (warningsFooter) warningsFooter.classList.add('hidden');
+        if (safeMessage) safeMessage.classList.remove('hidden');
     }
-    
-    console.log('[EFA] Results displayed successfully');
 }
