@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.5 - Removed team, .co, and all-hyphen false positives
+// Version 3.2.6 - Debug logging for org impersonation
 
 // ============================================
 // CONFIGURATION
@@ -572,6 +572,9 @@ function performAnalysis(emailData) {
     
     // 10. Organization Impersonation Detection (SSA, IRS, banks, etc.)
     // Skip for trusted domains - only check display name (not subject/body to avoid false positives)
+    console.log('DEBUG - Display Name:', displayName);
+    console.log('DEBUG - Subject:', subject);
+    console.log('DEBUG - Sender Domain:', senderDomain);
     const orgImpersonation = isTrustedDomain(senderDomain) ? null : detectOrganizationImpersonation(displayName, senderDomain);
     if (orgImpersonation) {
         warnings.push({
