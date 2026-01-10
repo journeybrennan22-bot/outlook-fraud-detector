@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.0 - Organization impersonation detection
+// Version 3.2.2 - Org impersonation checks body too
 
 // ============================================
 // CONFIGURATION
@@ -566,7 +566,7 @@ function performAnalysis(emailData) {
     
     // 10. Organization Impersonation Detection (SSA, IRS, banks, etc.)
     // Skip for trusted domains - no need to check our own company
-    const orgImpersonation = isTrustedDomain(senderDomain) ? null : detectOrganizationImpersonation(displayName, subject, senderDomain);
+    const orgImpersonation = isTrustedDomain(senderDomain) ? null : detectOrganizationImpersonation(displayName, subject, senderDomain, body);
     if (orgImpersonation) {
         warnings.push({
             type: 'org-impersonation',
@@ -589,11 +589,11 @@ function performAnalysis(emailData) {
 
 /**
  * Detect organization impersonation (e.g., fake SSA, IRS, banks)
- * Checks if display name or subject claims to be a known entity
+ * Checks if display name, subject, or body claims to be a known entity
  * but email comes from a non-legitimate domain
  */
-function detectOrganizationImpersonation(displayName, subject, senderDomain) {
-    const searchText = ((displayName || '') + ' ' + (subject || '')).toLowerCase();
+function detectOrganizationImpersonation(displayName, subject, senderDomain, body) {
+    const searchText = ((displayName || '') + ' ' + (subject || '') + ' ' + (body || '')).toLowerCase();
     const domainLower = senderDomain.toLowerCase();
     
     for (const [entity, legitimateDomains] of Object.entries(IMPERSONATION_TARGETS)) {
