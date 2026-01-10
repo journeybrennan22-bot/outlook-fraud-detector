@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.4 - Org impersonation only checks display name
+// Version 3.2.5 - Removed team, .co, and all-hyphen false positives
 
 // ============================================
 // CONFIGURATION
@@ -19,7 +19,7 @@ const SUSPICIOUS_DOMAIN_WORDS = [
     'billing', 'payment', 'invoice', 'refund', 'claim',
     'unlock', 'suspended', 'locked', 'verify', 'validate',
     'official', 'authentic', 'legit', 'real', 'genuine',
-    'team', 'dept', 'department', 'center', 'centre',
+    'dept', 'department', 'center', 'centre',
     'online', 'web', 'portal', 'access', 'customer'
 ];
 
@@ -37,7 +37,7 @@ const DECEPTIVE_TLDS = [
     '.com.co', '.com.br', '.com.mx', '.com.ar', '.com.au', '.com.ng',
     '.com.pk', '.com.ph', '.com.ua', '.com.ve', '.com.vn', '.com.tr',
     '.net.co', '.net.br', '.org.co', '.co.uk.com', '.us.com',
-    '.co', '.cm', '.cc', '.ru', '.cn', '.tk', '.ml', '.ga', '.cf'
+    '.cm', '.cc', '.ru', '.cn', '.tk', '.ml', '.ga', '.cf'
 ];
 
 // ============================================
@@ -665,11 +665,8 @@ function detectSuspiciousDomain(domain) {
             }
         }
         
-        // Any hyphenated domain is slightly suspicious
-        return {
-            pattern: 'hyphenated domain',
-            reason: `Hyphenated domains like "${domainName}" are commonly used in phishing. Verify this sender.`
-        };
+        // Don't flag all hyphenated domains - many are legitimate (e.g., newsletters)
+        // Only flag if suspicious word found above
     }
     
     // Check for suspicious words anywhere in non-hyphenated domain
