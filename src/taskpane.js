@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.1.0 - Contextual keyword explanations
+// Version 3.2.0 - Organization impersonation detection
 
 // ============================================
 // CONFIGURATION
@@ -9,6 +9,239 @@ const CONFIG = {
     redirectUri: 'https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html',
     scopes: ['User.Read', 'Contacts.Read'],
     trustedDomains: ['baynac.com', 'purelogicescrow.com', 'journeyinsurance.com']
+};
+
+// ============================================
+// ORGANIZATION IMPERSONATION TARGETS
+// Maps commonly impersonated entities to their legitimate domains
+// ============================================
+const IMPERSONATION_TARGETS = {
+    // US Government - Federal
+    "social security": ["ssa.gov"],
+    "social security administration": ["ssa.gov"],
+    "ssa": ["ssa.gov"],
+    "internal revenue service": ["irs.gov"],
+    "irs": ["irs.gov"],
+    "treasury department": ["treasury.gov"],
+    "us treasury": ["treasury.gov"],
+    "department of treasury": ["treasury.gov"],
+    "medicare": ["medicare.gov", "cms.gov"],
+    "medicaid": ["medicaid.gov", "cms.gov"],
+    "cms": ["cms.gov"],
+    "federal bureau of investigation": ["fbi.gov"],
+    "fbi": ["fbi.gov"],
+    "veterans affairs": ["va.gov"],
+    "department of veterans affairs": ["va.gov"],
+    "va benefits": ["va.gov"],
+    "federal trade commission": ["ftc.gov"],
+    "ftc": ["ftc.gov"],
+    "department of homeland security": ["dhs.gov"],
+    "homeland security": ["dhs.gov"],
+    "dhs": ["dhs.gov"],
+    "immigration": ["uscis.gov"],
+    "uscis": ["uscis.gov"],
+    "us citizenship": ["uscis.gov"],
+    "department of justice": ["justice.gov", "usdoj.gov"],
+    "doj": ["justice.gov"],
+    "department of labor": ["dol.gov"],
+    "unemployment benefits": ["dol.gov"],
+    "small business administration": ["sba.gov"],
+    "sba": ["sba.gov"],
+    "sba loan": ["sba.gov"],
+    "federal housing administration": ["hud.gov"],
+    "fha": ["hud.gov"],
+    "hud": ["hud.gov"],
+    "student aid": ["studentaid.gov", "ed.gov"],
+    "fafsa": ["studentaid.gov", "ed.gov"],
+    "department of education": ["ed.gov"],
+
+    // Shipping & Postal
+    "usps": ["usps.com"],
+    "postal service": ["usps.com"],
+    "us postal service": ["usps.com"],
+    "united states postal": ["usps.com"],
+    "ups": ["ups.com"],
+    "united parcel service": ["ups.com"],
+    "fedex": ["fedex.com"],
+    "federal express": ["fedex.com"],
+    "dhl": ["dhl.com"],
+
+    // Major Banks
+    "wells fargo": ["wellsfargo.com"],
+    "bank of america": ["bankofamerica.com", "bofa.com"],
+    "bofa": ["bankofamerica.com", "bofa.com"],
+    "chase": ["chase.com", "jpmorganchase.com"],
+    "jpmorgan": ["chase.com", "jpmorganchase.com"],
+    "jp morgan": ["chase.com", "jpmorganchase.com"],
+    "citibank": ["citi.com", "citibank.com"],
+    "citi": ["citi.com", "citibank.com"],
+    "citigroup": ["citi.com", "citibank.com"],
+    "us bank": ["usbank.com"],
+    "u.s. bank": ["usbank.com"],
+    "pnc": ["pnc.com"],
+    "pnc bank": ["pnc.com"],
+    "capital one": ["capitalone.com"],
+    "td bank": ["td.com", "tdbank.com"],
+    "truist": ["truist.com"],
+    "regions": ["regions.com"],
+    "regions bank": ["regions.com"],
+    "fifth third": ["53.com"],
+    "fifth third bank": ["53.com"],
+    "huntington bank": ["huntington.com"],
+    "huntington": ["huntington.com"],
+    "ally bank": ["ally.com"],
+    "ally": ["ally.com"],
+    "discover": ["discover.com"],
+    "discover bank": ["discover.com"],
+    "american express": ["americanexpress.com", "amex.com"],
+    "amex": ["americanexpress.com", "amex.com"],
+    "navy federal": ["navyfederal.org"],
+    "navy federal credit union": ["navyfederal.org"],
+    "usaa": ["usaa.com"],
+
+    // Tech Companies
+    "microsoft": ["microsoft.com", "office.com", "live.com", "outlook.com"],
+    "office 365": ["microsoft.com", "office.com"],
+    "microsoft 365": ["microsoft.com", "office.com"],
+    "outlook": ["microsoft.com", "outlook.com"],
+    "onedrive": ["microsoft.com"],
+    "google": ["google.com", "gmail.com"],
+    "gmail": ["google.com", "gmail.com"],
+    "google drive": ["google.com"],
+    "apple": ["apple.com", "icloud.com"],
+    "icloud": ["apple.com", "icloud.com"],
+    "apple id": ["apple.com"],
+    "itunes": ["apple.com"],
+    "app store": ["apple.com"],
+    "amazon": ["amazon.com", "amazon.co.uk", "amazonaws.com"],
+    "amazon prime": ["amazon.com"],
+    "aws": ["amazon.com", "amazonaws.com"],
+    "meta": ["meta.com", "facebook.com", "fb.com"],
+    "facebook": ["facebook.com", "fb.com", "meta.com"],
+    "instagram": ["instagram.com", "meta.com"],
+    "whatsapp": ["whatsapp.com", "meta.com"],
+    "linkedin": ["linkedin.com"],
+    "twitter": ["twitter.com", "x.com"],
+    "x.com": ["twitter.com", "x.com"],
+    "netflix": ["netflix.com"],
+    "spotify": ["spotify.com"],
+    "zoom": ["zoom.us"],
+    "zoom meeting": ["zoom.us"],
+    "dropbox": ["dropbox.com"],
+
+    // Document Signing / Business Tools
+    "docusign": ["docusign.com", "docusign.net"],
+    "adobe": ["adobe.com"],
+    "adobe sign": ["adobe.com", "adobesign.com"],
+    "acrobat": ["adobe.com"],
+    "intuit": ["intuit.com"],
+    "quickbooks": ["intuit.com", "quickbooks.com"],
+    "turbotax": ["intuit.com", "turbotax.com"],
+    "salesforce": ["salesforce.com"],
+
+    // Payment Platforms
+    "paypal": ["paypal.com"],
+    "venmo": ["venmo.com"],
+    "zelle": ["zellepay.com"],
+    "cash app": ["cash.app", "square.com"],
+    "cashapp": ["cash.app", "square.com"],
+    "square": ["square.com", "squareup.com"],
+    "stripe": ["stripe.com"],
+    "wise": ["wise.com"],
+    "transferwise": ["wise.com"],
+
+    // Telecoms
+    "verizon": ["verizon.com", "verizonwireless.com"],
+    "at&t": ["att.com"],
+    "att": ["att.com"],
+    "t-mobile": ["t-mobile.com"],
+    "tmobile": ["t-mobile.com"],
+    "comcast": ["comcast.com", "xfinity.com"],
+    "xfinity": ["comcast.com", "xfinity.com"],
+    "spectrum": ["spectrum.com", "charter.com"],
+
+    // Credit Bureaus
+    "equifax": ["equifax.com"],
+    "experian": ["experian.com"],
+    "transunion": ["transunion.com"],
+    "credit karma": ["creditkarma.com"],
+
+    // Title & Escrow Companies
+    "fidelity national title": ["fnf.com", "fntg.com"],
+    "fidelity title": ["fnf.com", "fntg.com"],
+    "first american title": ["firstam.com"],
+    "first american": ["firstam.com"],
+    "chicago title": ["chicagotitle.com", "fnf.com"],
+    "stewart title": ["stewart.com"],
+    "old republic title": ["oldrepublictitle.com", "oldrepublic.com"],
+
+    // Mortgage / Lending
+    "fannie mae": ["fanniemae.com"],
+    "freddie mac": ["freddiemac.com"],
+    "rocket mortgage": ["rocketmortgage.com", "quickenloans.com"],
+    "quicken loans": ["rocketmortgage.com", "quickenloans.com"],
+    "united wholesale mortgage": ["uwm.com"],
+    "uwm": ["uwm.com"],
+    "loandepot": ["loandepot.com"],
+    "loan depot": ["loandepot.com"],
+    "better mortgage": ["better.com"],
+
+    // Real Estate Platforms
+    "zillow": ["zillow.com"],
+    "redfin": ["redfin.com"],
+    "realtor.com": ["realtor.com"],
+    "trulia": ["trulia.com"],
+
+    // Crypto / Investment
+    "coinbase": ["coinbase.com"],
+    "robinhood": ["robinhood.com"],
+    "fidelity investments": ["fidelity.com"],
+    "fidelity": ["fidelity.com"],
+    "charles schwab": ["schwab.com"],
+    "schwab": ["schwab.com"],
+    "vanguard": ["vanguard.com"],
+    "e*trade": ["etrade.com"],
+    "etrade": ["etrade.com"],
+    "td ameritrade": ["tdameritrade.com"],
+
+    // E-Commerce / Retail
+    "walmart": ["walmart.com"],
+    "target": ["target.com"],
+    "ebay": ["ebay.com"],
+    "best buy": ["bestbuy.com"],
+    "costco": ["costco.com"],
+
+    // International - UK
+    "hmrc": ["gov.uk"],
+    "nhs": ["nhs.uk"],
+    "dvla": ["gov.uk"],
+    "royal mail": ["royalmail.com"],
+    "barclays": ["barclays.co.uk", "barclays.com"],
+    "hsbc": ["hsbc.co.uk", "hsbc.com"],
+    "lloyds": ["lloydsbank.com"],
+    "natwest": ["natwest.com"],
+
+    // International - Canada
+    "canada revenue agency": ["canada.ca"],
+    "cra": ["canada.ca"],
+    "service canada": ["canada.ca"],
+    "canada post": ["canadapost.ca", "canadapost-postescanada.ca"],
+    "rbc": ["rbc.com", "royalbank.com"],
+    "td canada": ["td.com"],
+    "scotiabank": ["scotiabank.com"],
+    "bmo": ["bmo.com"],
+    "cibc": ["cibc.com"],
+
+    // International - Australia
+    "ato": ["ato.gov.au"],
+    "australian taxation office": ["ato.gov.au"],
+    "centrelink": ["servicesaustralia.gov.au"],
+    "australia post": ["auspost.com.au"],
+    "commbank": ["commbank.com.au"],
+    "commonwealth bank": ["commbank.com.au"],
+    "westpac": ["westpac.com.au"],
+    "anz": ["anz.com.au", "anz.com"],
+    "nab": ["nab.com.au"]
 };
 
 // Suspicious words commonly used in fake domains
@@ -389,7 +622,21 @@ function performAnalysis(emailData) {
         }
     }
     
-    // 2. Deceptive TLD Detection
+    // 2. Organization Impersonation Detection (NEW)
+    const orgImpersonation = detectOrganizationImpersonation(senderEmail, displayName, subject);
+    if (orgImpersonation) {
+        warnings.push({
+            type: 'org-impersonation',
+            severity: 'critical',
+            title: 'Organization Impersonation',
+            description: orgImpersonation.message,
+            senderEmail: senderEmail,
+            matchedEmail: orgImpersonation.legitimateDomains.join(', '),
+            entityClaimed: orgImpersonation.entityClaimed
+        });
+    }
+    
+    // 3. Deceptive TLD Detection
     const deceptiveTld = detectDeceptiveTLD(senderDomain);
     if (deceptiveTld) {
         warnings.push({
@@ -402,7 +649,7 @@ function performAnalysis(emailData) {
         });
     }
     
-    // 3. Suspicious Domain Pattern Detection (NEW - pattern based)
+    // 4. Suspicious Domain Pattern Detection
     const suspiciousDomain = detectSuspiciousDomain(senderDomain);
     if (suspiciousDomain) {
         warnings.push({
@@ -415,7 +662,7 @@ function performAnalysis(emailData) {
         });
     }
     
-    // 4. Display Name Suspicion (NEW - pattern based)
+    // 5. Display Name Suspicion (pattern based)
     if (!isKnownContact) {
         const displaySuspicion = detectSuspiciousDisplayName(displayName, senderDomain);
         if (displaySuspicion) {
@@ -430,7 +677,7 @@ function performAnalysis(emailData) {
         }
     }
     
-    // 5. Display Name Impersonation (trusted domains)
+    // 6. Display Name Impersonation (trusted domains)
     if (!isKnownContact) {
         const impersonation = detectDisplayNameImpersonation(displayName, senderDomain);
         if (impersonation) {
@@ -445,7 +692,7 @@ function performAnalysis(emailData) {
         }
     }
     
-    // 6. Homoglyph/Unicode Detection
+    // 7. Homoglyph/Unicode Detection
     const homoglyph = detectHomoglyphs(senderEmail);
     if (homoglyph) {
         warnings.push({
@@ -459,7 +706,7 @@ function performAnalysis(emailData) {
         });
     }
     
-    // 7. Lookalike Domain Detection (your trusted domains)
+    // 8. Lookalike Domain Detection (your trusted domains)
     const lookalike = detectLookalikeDomain(senderDomain);
     if (lookalike) {
         warnings.push({
@@ -472,7 +719,7 @@ function performAnalysis(emailData) {
         });
     }
     
-    // 8. Fraud Keywords - now with contextual explanations
+    // 9. Fraud Keywords - with contextual explanations
     const wireKeywords = detectWireFraudKeywords(fullContent);
     if (wireKeywords.length > 0) {
         const keywordInfo = getKeywordExplanation(wireKeywords[0]);
@@ -488,7 +735,7 @@ function performAnalysis(emailData) {
         });
     }
     
-    // 9. Contact Lookalike Detection (skip if known contact)
+    // 10. Contact Lookalike Detection (skip if known contact)
     if (!isKnownContact) {
         const contactLookalike = detectContactLookalike(senderEmail);
         if (contactLookalike) {
@@ -510,6 +757,58 @@ function performAnalysis(emailData) {
 // ============================================
 // DETECTION FUNCTIONS
 // ============================================
+
+/**
+ * Detect organization impersonation
+ * Checks if sender claims to be a known organization but sends from wrong domain
+ */
+function detectOrganizationImpersonation(senderEmail, displayName, subject) {
+    const senderDomain = senderEmail.split('@')[1]?.toLowerCase();
+    if (!senderDomain) return null;
+    
+    // Combine display name and subject for searching
+    const searchText = `${displayName} ${subject}`.toLowerCase();
+    
+    // Check each impersonation target
+    for (const [entityName, legitimateDomains] of Object.entries(IMPERSONATION_TARGETS)) {
+        // Use word boundary matching to prevent false positives (e.g., "chase" in "purchase")
+        const entityPattern = new RegExp(`\\b${escapeRegex(entityName)}\\b`, 'i');
+        
+        if (entityPattern.test(searchText)) {
+            // Check if sender domain matches any legitimate domain
+            const isLegitimate = legitimateDomains.some(legit => {
+                return senderDomain === legit || senderDomain.endsWith(`.${legit}`);
+            });
+            
+            if (!isLegitimate) {
+                return {
+                    entityClaimed: formatEntityName(entityName),
+                    senderDomain: senderDomain,
+                    legitimateDomains: legitimateDomains,
+                    message: `Sender claims to be "${formatEntityName(entityName)}" but email comes from ${senderDomain}. Legitimate emails come from: ${legitimateDomains.join(', ')}`
+                };
+            }
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Escape special regex characters
+ */
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Format entity name for display (capitalize first letters)
+ */
+function formatEntityName(name) {
+    return name.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+}
 
 /**
  * Detect deceptive TLDs like .com.co, .com.br, etc.
@@ -844,6 +1143,24 @@ function displayResults(warnings, senderEmail) {
                     </div>
                     <div class="warning-advice">
                         <strong>Why this matters:</strong> ${w.keywordExplanation}
+                    </div>
+                `;
+            } else if (w.type === 'org-impersonation') {
+                // Special display for organization impersonation
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Claims to be:</span>
+                            <span class="warning-email-value known">${w.entityClaimed}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Actually from:</span>
+                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Legitimate domains:</span>
+                            <span class="warning-email-value known">${w.matchedEmail}</span>
+                        </div>
                     </div>
                 `;
             } else if (w.senderEmail && w.matchedEmail) {
