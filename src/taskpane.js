@@ -275,6 +275,8 @@ let knownContacts = new Set();
 let currentUserEmail = null;
 let currentItemId = null;
 let isAutoScanEnabled = true;
+let isAuthenticating = false;
+let authFailed = false;
 
 // ============================================
 // INITIALIZATION
@@ -332,6 +334,8 @@ function onItemChanged() {
 // ============================================
 async function getAccessToken() {
     if (!msalInstance) return null;
+    if (isAuthenticating) return null;
+    if (authFailed) return null;
     
     const accounts = msalInstance.getAllAccounts();
     
@@ -343,13 +347,22 @@ async function getAccessToken() {
             });
             return response.accessToken;
         } else {
+            isAuthenticating = true;
             const response = await msalInstance.acquireTokenPopup({
                 scopes: CONFIG.scopes
             });
+            isAuthenticating = false;
             return response.accessToken;
         }
     } catch (error) {
         console.log('Auth error:', error);
+        isAuthenticating = false;
+        if (error.errorCode === 'interaction_in_progress') {
+            // Wait and retry once
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return null;
+        }
+        authFailed = true;
         return null;
     }
 }
@@ -716,9 +729,13 @@ async function analyzeCurrentEmail() {
         // Get current user email
         currentUserEmail = Office.context.mailbox.userProfile.emailAddress;
         
-        // Fetch contacts if not already loaded
-        if (knownContacts.size === 0) {
-            await fetchAllKnownContacts();
+        // Try to fetch contacts if not already loaded (but don't block if it fails)
+        if (knownContacts.size === 0 && !authFailed) {
+            try {
+                await fetchAllKnownContacts();
+            } catch (e) {
+                console.log('Could not fetch contacts, continuing without them');
+            }
         }
         
         // Get email data
