@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.6 - Organization impersonation, keyword categories, false positive fixes
+// Version 3.2.7 - Fixed MSAL stuck auth handling
 
 // ============================================
 // CONFIGURATION
@@ -34,7 +34,7 @@ const SUSPICIOUS_DISPLAY_PATTERNS = [
 ];
 
 // Deceptive TLDs that look like .com but aren't
-// REMOVED: '.co' (legitimate Colombia TLD, heavily marketed as .com alternative)
+// REMOVED: '.co' (legitimate Colombia TLD)
 const DECEPTIVE_TLDS = [
     '.com.co', '.com.br', '.com.mx', '.com.ar', '.com.au', '.com.ng',
     '.com.pk', '.com.ph', '.com.ua', '.com.ve', '.com.vn', '.com.tr',
@@ -114,7 +114,7 @@ const IMPERSONATION_TARGETS = {
     "navy federal credit union": ["navyfederal.org"],
     "usaa": ["usaa.com"],
 
-    // Tech Companies - PHRASES ONLY (not standalone words like "microsoft" or "apple")
+    // Tech Companies - PHRASES ONLY (not standalone words)
     "microsoft support": ["microsoft.com"],
     "microsoft account": ["microsoft.com", "live.com"],
     "microsoft security": ["microsoft.com"],
@@ -275,22 +275,23 @@ let knownContacts = new Set();
 let currentUserEmail = null;
 let currentItemId = null;
 let isAutoScanEnabled = true;
-let isAuthenticating = false;
-let authFailed = false;
+let authInProgress = false;
+let contactsFetched = false;
 
 // ============================================
 // INITIALIZATION
 // ============================================
-Office.onReady((info) => {
+Office.onReady(async (info) => {
     if (info.host === Office.HostType.Outlook) {
-        initializeMsal();
+        console.log('Email Fraud Detector v3.2.7 starting...');
+        await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
     }
 });
 
-function initializeMsal() {
+async function initializeMsal() {
     const msalConfig = {
         auth: {
             clientId: CONFIG.clientId,
@@ -303,6 +304,14 @@ function initializeMsal() {
         }
     };
     msalInstance = new msal.PublicClientApplication(msalConfig);
+    
+    // CRITICAL: Clear any stuck interaction state from previous sessions
+    try {
+        await msalInstance.handleRedirectPromise();
+        console.log('MSAL initialized, cleared any pending auth');
+    } catch (e) {
+        console.log('MSAL init note:', e.message);
+    }
 }
 
 function setupEventHandlers() {
@@ -334,35 +343,49 @@ function onItemChanged() {
 // ============================================
 async function getAccessToken() {
     if (!msalInstance) return null;
-    if (isAuthenticating) return null;
-    if (authFailed) return null;
+    if (authInProgress) {
+        console.log('Auth already in progress, skipping');
+        return null;
+    }
     
     const accounts = msalInstance.getAllAccounts();
     
     try {
         if (accounts.length > 0) {
+            // Try silent auth first
             const response = await msalInstance.acquireTokenSilent({
                 scopes: CONFIG.scopes,
                 account: accounts[0]
             });
             return response.accessToken;
         } else {
-            isAuthenticating = true;
-            const response = await msalInstance.acquireTokenPopup({
-                scopes: CONFIG.scopes
-            });
-            isAuthenticating = false;
-            return response.accessToken;
+            // Need interactive auth - guard against multiple attempts
+            authInProgress = true;
+            try {
+                const response = await msalInstance.acquireTokenPopup({
+                    scopes: CONFIG.scopes
+                });
+                authInProgress = false;
+                return response.accessToken;
+            } catch (popupError) {
+                authInProgress = false;
+                throw popupError;
+            }
         }
     } catch (error) {
         console.log('Auth error:', error);
-        isAuthenticating = false;
+        authInProgress = false;
+        
+        // If interaction_in_progress, try to clear it
         if (error.errorCode === 'interaction_in_progress') {
-            // Wait and retry once
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            return null;
+            console.log('Clearing stuck auth state...');
+            try {
+                sessionStorage.clear();
+                await msalInstance.handleRedirectPromise();
+            } catch (e) {
+                // Ignore cleanup errors
+            }
         }
-        authFailed = true;
         return null;
     }
 }
@@ -412,8 +435,14 @@ async function fetchContacts(token) {
  * Fetch contacts and add current user email
  */
 async function fetchAllKnownContacts() {
+    if (contactsFetched) return; // Don't retry if already attempted
+    
     const token = await getAccessToken();
-    if (!token) return;
+    if (!token) {
+        console.log('No token available, continuing without contacts');
+        contactsFetched = true; // Mark as attempted
+        return;
+    }
     
     console.log('Fetching contacts...');
     
@@ -428,6 +457,7 @@ async function fetchAllKnownContacts() {
     }
     
     console.log('Total known contacts:', knownContacts.size);
+    contactsFetched = true;
 }
 
 // ============================================
@@ -729,13 +759,9 @@ async function analyzeCurrentEmail() {
         // Get current user email
         currentUserEmail = Office.context.mailbox.userProfile.emailAddress;
         
-        // Try to fetch contacts if not already loaded (but don't block if it fails)
-        if (knownContacts.size === 0 && !authFailed) {
-            try {
-                await fetchAllKnownContacts();
-            } catch (e) {
-                console.log('Could not fetch contacts, continuing without them');
-            }
+        // Try to fetch contacts (won't block if auth fails)
+        if (knownContacts.size === 0 && !contactsFetched) {
+            await fetchAllKnownContacts();
         }
         
         // Get email data
@@ -917,8 +943,8 @@ function processEmail(emailData) {
         });
     }
     
-    // 10. Contact Lookalike
-    if (!isKnownContact) {
+    // 10. Contact Lookalike (only if contacts were loaded)
+    if (!isKnownContact && knownContacts.size > 0) {
         const contactLookalike = detectContactLookalike(senderEmail);
         if (contactLookalike) {
             warnings.push({
