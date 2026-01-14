@@ -830,6 +830,7 @@ function processEmail(emailData) {
         if (replyToDomain.toLowerCase() !== senderDomain) {
             warnings.push({
                 type: 'replyto-mismatch',
+                severity: 'medium',
                 title: 'Reply-To Mismatch',
                 description: 'Replies will go to a different address than the sender.',
                 senderEmail: senderEmail,
@@ -844,6 +845,7 @@ function processEmail(emailData) {
         if (orgImpersonation) {
             warnings.push({
                 type: 'org-impersonation',
+                severity: 'critical',
                 title: 'Organization Impersonation',
                 description: orgImpersonation.message,
                 senderEmail: senderEmail,
@@ -858,6 +860,7 @@ function processEmail(emailData) {
     if (deceptiveTld) {
         warnings.push({
             type: 'deceptive-tld',
+            severity: 'critical',
             title: 'Deceptive Domain',
             description: `This domain uses "${deceptiveTld}" which is designed to look like a legitimate .com address.`,
             senderEmail: senderEmail,
@@ -870,6 +873,7 @@ function processEmail(emailData) {
     if (suspiciousDomain) {
         warnings.push({
             type: 'suspicious-domain',
+            severity: 'medium',
             title: 'Suspicious Domain',
             description: suspiciousDomain.reason,
             senderEmail: senderEmail,
@@ -883,6 +887,7 @@ function processEmail(emailData) {
         if (displaySuspicion) {
             warnings.push({
                 type: 'display-name-suspicion',
+                severity: 'medium',
                 title: 'Suspicious Display Name',
                 description: displaySuspicion.reason,
                 senderEmail: senderEmail,
@@ -897,6 +902,7 @@ function processEmail(emailData) {
         if (impersonation) {
             warnings.push({
                 type: 'impersonation',
+                severity: 'critical',
                 title: 'Display Name Impersonation',
                 description: impersonation.reason,
                 senderEmail: senderEmail,
@@ -910,6 +916,7 @@ function processEmail(emailData) {
     if (homoglyph) {
         warnings.push({
             type: 'homoglyph',
+            severity: 'critical',
             title: 'Invisible Character Trick',
             description: 'This email contains deceptive characters that look identical to normal letters.',
             senderEmail: senderEmail,
@@ -922,6 +929,7 @@ function processEmail(emailData) {
     if (lookalike) {
         warnings.push({
             type: 'lookalike-domain',
+            severity: 'critical',
             title: 'Lookalike Domain',
             description: `This domain is similar to ${lookalike.trustedDomain}`,
             senderEmail: senderEmail,
@@ -935,6 +943,7 @@ function processEmail(emailData) {
         const keywordInfo = getKeywordExplanation(wireKeywords[0]);
         warnings.push({
             type: 'wire-fraud',
+            severity: 'critical',
             title: 'Dangerous Keywords Detected',
             description: 'This email contains terms commonly used in wire fraud.',
             keywords: wireKeywords,
@@ -949,6 +958,7 @@ function processEmail(emailData) {
         if (contactLookalike) {
             warnings.push({
                 type: 'contact-lookalike',
+                severity: 'critical',
                 title: 'Lookalike Email Address',
                 description: 'This email is nearly identical to someone in your contacts, but slightly different.',
                 senderEmail: contactLookalike.incomingEmail,
@@ -959,11 +969,7 @@ function processEmail(emailData) {
     }
     
     // Display results
-    if (warnings.length > 0) {
-        showWarnings(warnings, senderEmail, displayName);
-    } else {
-        showSafe(senderEmail, displayName);
-    }
+    displayResults(warnings);
 }
 
 // ============================================
@@ -973,7 +979,6 @@ function showLoading() {
     document.getElementById('loading').classList.remove('hidden');
     document.getElementById('results').classList.add('hidden');
     document.getElementById('error').classList.add('hidden');
-    // Reset body class
     document.body.className = '';
 }
 
@@ -985,116 +990,110 @@ function showError(message) {
     document.body.className = '';
 }
 
-function showSafe(email, displayName) {
+function displayResults(warnings) {
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('error').classList.add('hidden');
     document.getElementById('results').classList.remove('hidden');
     
-    // Set body background to green
-    document.body.className = 'status-safe';
+    // Count warnings by severity
+    const criticalCount = warnings.filter(w => w.severity === 'critical').length;
+    const mediumCount = warnings.filter(w => w.severity === 'medium').length;
     
-    // Update status badge
+    // Set body background and status badge
+    document.body.classList.remove('status-critical', 'status-medium', 'status-info', 'status-safe');
+    
     const statusBadge = document.getElementById('status-badge');
-    statusBadge.className = 'status-badge safe';
-    statusBadge.querySelector('.status-icon').textContent = '✓';
-    statusBadge.querySelector('.status-text').textContent = 'No Warnings Detected';
+    const statusIcon = statusBadge.querySelector('.status-icon');
+    const statusText = statusBadge.querySelector('.status-text');
     
-    // Hide warnings section, show safe message
-    document.getElementById('warnings-section').classList.add('hidden');
-    document.getElementById('safe-message').classList.remove('hidden');
-}
-
-function showWarnings(warnings, senderEmail, displayName) {
-    document.getElementById('loading').classList.add('hidden');
-    document.getElementById('error').classList.add('hidden');
-    document.getElementById('results').classList.remove('hidden');
+    if (criticalCount > 0 || mediumCount > 0) {
+        const totalWarnings = criticalCount + mediumCount;
+        document.body.classList.add('status-critical');
+        statusBadge.className = 'status-badge danger';
+        statusIcon.textContent = '🚨';
+        statusText.textContent = `${totalWarnings} Warning${totalWarnings > 1 ? 's' : ''} Detected`;
+    } else {
+        document.body.classList.add('status-safe');
+        statusBadge.className = 'status-badge safe';
+        statusIcon.textContent = '✅';
+        statusText.textContent = 'No Issues Detected';
+    }
     
-    // Determine severity - critical if any warning, could be refined later
-    const hasCritical = warnings.some(w => 
-        w.type === 'contact-lookalike' || 
-        w.type === 'homoglyph' || 
-        w.type === 'org-impersonation' ||
-        w.type === 'lookalike-domain'
-    );
+    // Display warnings
+    const warningsSection = document.getElementById('warnings-section');
+    const warningsList = document.getElementById('warnings-list');
+    const warningsFooter = document.getElementById('warnings-footer');
+    const safeMessage = document.getElementById('safe-message');
     
-    // Set body background
-    document.body.className = hasCritical ? 'status-critical' : 'status-critical';
-    
-    // Update status badge
-    const statusBadge = document.getElementById('status-badge');
-    statusBadge.className = 'status-badge danger';
-    statusBadge.querySelector('.status-icon').textContent = '⚠️';
-    statusBadge.querySelector('.status-text').textContent = `${warnings.length} Warning${warnings.length > 1 ? 's' : ''} Detected`;
-    
-    // Build warning items HTML
-    const warningItemsHtml = warnings.map(w => {
-        let detailHtml = '';
-        const severity = 'critical'; // Could vary based on warning type
+    if (warnings.length > 0) {
+        warningsSection.classList.remove('hidden');
+        warningsFooter.classList.remove('hidden');
+        safeMessage.classList.add('hidden');
         
-        if (w.type === 'wire-fraud' && w.keywords) {
-            const keywordTags = w.keywords.slice(0, 5).map(k => 
-                `<span class="keyword-tag">${k}</span>`
-            ).join('');
-            detailHtml = `
-                <div class="warning-keywords-section">
-                    <div class="warning-keywords-label">Triggered by:</div>
-                    <div class="warning-keywords">${keywordTags}</div>
-                </div>
-                <div class="warning-advice">
-                    <strong>Why this matters:</strong> ${w.keywordExplanation}
+        warningsList.innerHTML = warnings.map(w => {
+            let emailHtml = '';
+            
+            if (w.type === 'wire-fraud' && w.keywords) {
+                const keywordTags = w.keywords.slice(0, 5).map(k => 
+                    `<span class="keyword-tag">${k}</span>`
+                ).join('');
+                emailHtml = `
+                    <div class="warning-keywords-section">
+                        <div class="warning-keywords-label">Triggered by:</div>
+                        <div class="warning-keywords">${keywordTags}</div>
+                    </div>
+                    <div class="warning-advice">
+                        <strong>Why this matters:</strong> ${w.keywordExplanation}
+                    </div>
+                `;
+            } else if (w.type === 'org-impersonation') {
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Claims to be:</span>
+                            <span class="warning-email-value known">${w.entityClaimed}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Actually from:</span>
+                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Legitimate domains:</span>
+                            <span class="warning-email-value known">${w.legitimateDomains.join(', ')}</span>
+                        </div>
+                    </div>
+                `;
+            } else if (w.senderEmail && w.matchedEmail) {
+                const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : 
+                                   w.type === 'impersonation' ? 'Display name shows' : 'Similar to';
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Sender:</span>
+                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">${matchLabel}:</span>
+                            <span class="warning-email-value known">${w.matchedEmail}</span>
+                        </div>
+                        ${w.reason ? `<div class="warning-reason">${w.reason}</div>` : ''}
+                    </div>
+                `;
+            } else if (w.detail) {
+                emailHtml = `<div class="warning-reason">${w.detail}</div>`;
+            }
+            
+            return `
+                <div class="warning-item ${w.severity}">
+                    <div class="warning-title">${w.title}</div>
+                    <div class="warning-description">${w.description}</div>
+                    ${emailHtml}
                 </div>
             `;
-        } else if (w.type === 'org-impersonation') {
-            detailHtml = `
-                <div class="warning-emails">
-                    <div class="warning-email-row">
-                        <span class="warning-email-label">Claims to be:</span>
-                        <span class="warning-email-value known">${w.entityClaimed}</span>
-                    </div>
-                    <div class="warning-email-row">
-                        <span class="warning-email-label">Actually from:</span>
-                        <span class="warning-email-value suspicious">${w.senderEmail}</span>
-                    </div>
-                    <div class="warning-email-row">
-                        <span class="warning-email-label">Legitimate domains:</span>
-                        <span class="warning-email-value known">${w.legitimateDomains.join(', ')}</span>
-                    </div>
-                </div>
-            `;
-        } else if (w.senderEmail && w.matchedEmail) {
-            const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : 
-                               w.type === 'impersonation' ? 'Display name shows' : 'Similar to';
-            detailHtml = `
-                <div class="warning-emails">
-                    <div class="warning-email-row">
-                        <span class="warning-email-label">Sender:</span>
-                        <span class="warning-email-value suspicious">${w.senderEmail}</span>
-                    </div>
-                    <div class="warning-email-row">
-                        <span class="warning-email-label">${matchLabel}:</span>
-                        <span class="warning-email-value known">${w.matchedEmail}</span>
-                    </div>
-                    ${w.reason ? `<div class="warning-reason">${w.reason}</div>` : ''}
-                </div>
-            `;
-        } else if (w.detail) {
-            detailHtml = `<div class="warning-reason">${w.detail}</div>`;
-        }
-        
-        return `
-            <div class="warning-item ${severity}">
-                <div class="warning-title">${w.title}</div>
-                <div class="warning-description">${w.description}</div>
-                ${detailHtml}
-            </div>
-        `;
-    }).join('');
-    
-    // Populate warnings list
-    document.getElementById('warnings-list').innerHTML = warningItemsHtml;
-    
-    // Show warnings section and footer, hide safe message
-    document.getElementById('warnings-section').classList.remove('hidden');
-    document.getElementById('warnings-footer').classList.remove('hidden');
-    document.getElementById('safe-message').classList.add('hidden');
+        }).join('');
+    } else {
+        warningsSection.classList.add('hidden');
+        warningsFooter.classList.add('hidden');
+        safeMessage.classList.remove('hidden');
+    }
 }
