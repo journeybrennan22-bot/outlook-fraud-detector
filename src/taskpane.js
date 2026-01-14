@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.7 - Fixed MSAL stuck auth handling
+// Version 3.2.8 - Fixed hidden class display issue
 
 // ============================================
 // CONFIGURATION
@@ -283,7 +283,7 @@ let contactsFetched = false;
 // ============================================
 Office.onReady(async (info) => {
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.2.7 starting...');
+        console.log('Email Fraud Detector v3.2.8 starting...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
@@ -970,22 +970,22 @@ function processEmail(emailData) {
 // UI FUNCTIONS
 // ============================================
 function showLoading() {
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('results').style.display = 'none';
-    document.getElementById('error').style.display = 'none';
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('results').classList.add('hidden');
+    document.getElementById('error').classList.add('hidden');
 }
 
 function showError(message) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('results').style.display = 'none';
-    document.getElementById('error').style.display = 'block';
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('results').classList.add('hidden');
+    document.getElementById('error').classList.remove('hidden');
     document.getElementById('error-message').textContent = message;
 }
 
 function showSafe(email, displayName) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('error').style.display = 'none';
-    document.getElementById('results').style.display = 'block';
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('error').classList.add('hidden');
+    document.getElementById('results').classList.remove('hidden');
     
     const resultsDiv = document.getElementById('results');
     resultsDiv.innerHTML = `
@@ -1002,9 +1002,9 @@ function showSafe(email, displayName) {
 }
 
 function showWarnings(warnings, senderEmail, displayName) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('error').style.display = 'none';
-    document.getElementById('results').style.display = 'block';
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('error').classList.add('hidden');
+    document.getElementById('results').classList.remove('hidden');
     
     const resultsDiv = document.getElementById('results');
     
