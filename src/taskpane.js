@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.7 - Fixed MSAL stuck auth handling
+// Version 3.2.8 - Fixed hidden class display issue
 
 // ============================================
 // CONFIGURATION
@@ -283,7 +283,7 @@ let contactsFetched = false;
 // ============================================
 Office.onReady(async (info) => {
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.2.7 starting...');
+        console.log('Email Fraud Detector v3.2.8 starting...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
@@ -970,55 +970,75 @@ function processEmail(emailData) {
 // UI FUNCTIONS
 // ============================================
 function showLoading() {
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('results').style.display = 'none';
-    document.getElementById('error').style.display = 'none';
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('results').classList.add('hidden');
+    document.getElementById('error').classList.add('hidden');
+    // Reset body class
+    document.body.className = '';
 }
 
 function showError(message) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('results').style.display = 'none';
-    document.getElementById('error').style.display = 'block';
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('results').classList.add('hidden');
+    document.getElementById('error').classList.remove('hidden');
     document.getElementById('error-message').textContent = message;
+    document.body.className = '';
 }
 
 function showSafe(email, displayName) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('error').style.display = 'none';
-    document.getElementById('results').style.display = 'block';
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('error').classList.add('hidden');
+    document.getElementById('results').classList.remove('hidden');
     
-    const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = `
-        <div class="safe-result">
-            <div class="safe-icon">✓</div>
-            <h2>No Threats Detected</h2>
-            <p class="sender-info">
-                <strong>${displayName || 'Unknown'}</strong><br>
-                <span class="email">${email}</span>
-            </p>
-            <p class="safe-message">This email passed all fraud detection checks.</p>
-        </div>
-    `;
+    // Set body background to green
+    document.body.className = 'status-safe';
+    
+    // Update status badge
+    const statusBadge = document.getElementById('status-badge');
+    statusBadge.className = 'status-badge safe';
+    statusBadge.querySelector('.status-icon').textContent = '✓';
+    statusBadge.querySelector('.status-text').textContent = 'No Warnings Detected';
+    
+    // Hide warnings section, show safe message
+    document.getElementById('warnings-section').classList.add('hidden');
+    document.getElementById('safe-message').classList.remove('hidden');
 }
 
 function showWarnings(warnings, senderEmail, displayName) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('error').style.display = 'none';
-    document.getElementById('results').style.display = 'block';
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('error').classList.add('hidden');
+    document.getElementById('results').classList.remove('hidden');
     
-    const resultsDiv = document.getElementById('results');
+    // Determine severity - critical if any warning, could be refined later
+    const hasCritical = warnings.some(w => 
+        w.type === 'contact-lookalike' || 
+        w.type === 'homoglyph' || 
+        w.type === 'org-impersonation' ||
+        w.type === 'lookalike-domain'
+    );
     
+    // Set body background
+    document.body.className = hasCritical ? 'status-critical' : 'status-critical';
+    
+    // Update status badge
+    const statusBadge = document.getElementById('status-badge');
+    statusBadge.className = 'status-badge danger';
+    statusBadge.querySelector('.status-icon').textContent = '⚠️';
+    statusBadge.querySelector('.status-text').textContent = `${warnings.length} Warning${warnings.length > 1 ? 's' : ''} Detected`;
+    
+    // Build warning items HTML
     const warningItemsHtml = warnings.map(w => {
         let detailHtml = '';
+        const severity = 'critical'; // Could vary based on warning type
         
         if (w.type === 'wire-fraud' && w.keywords) {
             const keywordTags = w.keywords.slice(0, 5).map(k => 
                 `<span class="keyword-tag">${k}</span>`
             ).join('');
             detailHtml = `
-                <div class="warning-keywords">
-                    <div class="keywords-label">Triggered by:</div>
-                    <div class="keywords-list">${keywordTags}</div>
+                <div class="warning-keywords-section">
+                    <div class="warning-keywords-label">Triggered by:</div>
+                    <div class="warning-keywords">${keywordTags}</div>
                 </div>
                 <div class="warning-advice">
                     <strong>Why this matters:</strong> ${w.keywordExplanation}
@@ -1027,17 +1047,17 @@ function showWarnings(warnings, senderEmail, displayName) {
         } else if (w.type === 'org-impersonation') {
             detailHtml = `
                 <div class="warning-emails">
-                    <div class="email-row">
-                        <span class="label">Claims to be:</span>
-                        <span class="value safe">${w.entityClaimed}</span>
+                    <div class="warning-email-row">
+                        <span class="warning-email-label">Claims to be:</span>
+                        <span class="warning-email-value known">${w.entityClaimed}</span>
                     </div>
-                    <div class="email-row">
-                        <span class="label">Actually from:</span>
-                        <span class="value suspicious">${w.senderEmail}</span>
+                    <div class="warning-email-row">
+                        <span class="warning-email-label">Actually from:</span>
+                        <span class="warning-email-value suspicious">${w.senderEmail}</span>
                     </div>
-                    <div class="email-row">
-                        <span class="label">Legitimate domains:</span>
-                        <span class="value safe">${w.legitimateDomains.join(', ')}</span>
+                    <div class="warning-email-row">
+                        <span class="warning-email-label">Legitimate domains:</span>
+                        <span class="warning-email-value known">${w.legitimateDomains.join(', ')}</span>
                     </div>
                 </div>
             `;
@@ -1046,23 +1066,23 @@ function showWarnings(warnings, senderEmail, displayName) {
                                w.type === 'impersonation' ? 'Display name shows' : 'Similar to';
             detailHtml = `
                 <div class="warning-emails">
-                    <div class="email-row">
-                        <span class="label">Sender:</span>
-                        <span class="value suspicious">${w.senderEmail}</span>
+                    <div class="warning-email-row">
+                        <span class="warning-email-label">Sender:</span>
+                        <span class="warning-email-value suspicious">${w.senderEmail}</span>
                     </div>
-                    <div class="email-row">
-                        <span class="label">${matchLabel}:</span>
-                        <span class="value safe">${w.matchedEmail}</span>
+                    <div class="warning-email-row">
+                        <span class="warning-email-label">${matchLabel}:</span>
+                        <span class="warning-email-value known">${w.matchedEmail}</span>
                     </div>
-                    ${w.reason ? `<div class="reason">${w.reason}</div>` : ''}
+                    ${w.reason ? `<div class="warning-reason">${w.reason}</div>` : ''}
                 </div>
             `;
         } else if (w.detail) {
-            detailHtml = `<div class="detail">${w.detail}</div>`;
+            detailHtml = `<div class="warning-reason">${w.detail}</div>`;
         }
         
         return `
-            <div class="warning-item">
+            <div class="warning-item ${severity}">
                 <div class="warning-title">${w.title}</div>
                 <div class="warning-description">${w.description}</div>
                 ${detailHtml}
@@ -1070,24 +1090,11 @@ function showWarnings(warnings, senderEmail, displayName) {
         `;
     }).join('');
     
-    resultsDiv.innerHTML = `
-        <div class="warning-result">
-            <div class="warning-header">
-                <div class="warning-icon">⚠️</div>
-                <div class="warning-header-content">
-                    <h2>${warnings.length} Warning${warnings.length > 1 ? 's' : ''} Detected</h2>
-                    <a href="https://emailfraudalert.com/learn.html?v=2" target="_blank" class="learn-link">See how this scam works →</a>
-                </div>
-            </div>
-            
-            <div class="sender-info">
-                <strong>${displayName || 'Unknown'}</strong><br>
-                <span class="email">${senderEmail}</span>
-            </div>
-            
-            <div class="warnings-list">
-                ${warningItemsHtml}
-            </div>
-        </div>
-    `;
+    // Populate warnings list
+    document.getElementById('warnings-list').innerHTML = warningItemsHtml;
+    
+    // Show warnings section and footer, hide safe message
+    document.getElementById('warnings-section').classList.remove('hidden');
+    document.getElementById('warnings-footer').classList.remove('hidden');
+    document.getElementById('safe-message').classList.add('hidden');
 }
