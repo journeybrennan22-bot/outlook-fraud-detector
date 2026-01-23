@@ -1152,15 +1152,7 @@ function displayResults(warnings) {
                 emailHtml = `
                     <div class="warning-emails">
                         <div class="warning-email-row">
-                            <span class="warning-email-label">Claims to be:</span>
-                            <span class="warning-email-value known">${w.brandClaimed}</span>
-                        </div>
-                        <div class="warning-email-row">
-                            <span class="warning-email-label">Actually from:</span>
-                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
-                        </div>
-                        <div class="warning-email-row">
-                            <span class="warning-email-label">Legitimate domains:</span>
+                            <span class="warning-email-label">Legitimate ${w.brandClaimed} domains:</span>
                             <span class="warning-email-value known">${w.legitimateDomains.join(', ')}</span>
                         </div>
                     </div>
