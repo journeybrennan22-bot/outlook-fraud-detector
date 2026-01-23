@@ -527,10 +527,13 @@ function levenshteinDistance(a, b) {
  * This is separate from org impersonation which only checks display name
  */
 function detectBrandImpersonation(subject, body, senderDomain) {
+    console.log('BRAND CHECK CALLED - Domain:', senderDomain);
     if (!senderDomain) return null;
     
     const contentLower = ((subject || '') + ' ' + (body || '')).toLowerCase();
     const domainLower = senderDomain.toLowerCase();
+    
+    console.log('BRAND CHECK - Contains docusign:', contentLower.includes('docusign'));
     
     for (const [brandName, config] of Object.entries(BRAND_CONTENT_DETECTION)) {
         // Check if any brand keyword appears in content
@@ -538,11 +541,15 @@ function detectBrandImpersonation(subject, body, senderDomain) {
             contentLower.includes(keyword.toLowerCase())
         );
         
+        console.log('BRAND CHECK -', brandName, '- mentionsBrand:', mentionsBrand);
+        
         if (mentionsBrand) {
             // Check if sender is from legitimate domain
             const isLegitimate = config.legitimateDomains.some(legit => 
                 domainLower === legit || domainLower.endsWith(`.${legit}`)
             );
+            
+            console.log('BRAND CHECK -', brandName, '- isLegitimate:', isLegitimate, '- domain:', domainLower);
             
             if (!isLegitimate) {
                 return {
