@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.8 - Fixed hidden class display issue
+// Version 3.2.9 - Added brand impersonation detection (content-based)
 
 // ============================================
 // CONFIGURATION
@@ -41,6 +41,20 @@ const DECEPTIVE_TLDS = [
     '.net.co', '.net.br', '.org.co', '.co.uk.com', '.us.com',
     '.cm', '.cc', '.ru', '.cn', '.tk', '.ml', '.ga', '.cf'
 ];
+
+// ============================================
+// BRAND IMPERSONATION DETECTION (CONTENT-BASED)
+// Scans email body/subject for brand mentions, verifies sender domain
+// ============================================
+const BRAND_CONTENT_DETECTION = {
+    'docusign': {
+        keywords: ['docusign'],
+        legitimateDomains: ['docusign.com', 'docusign.net']
+    }
+    // Future brands can be added here:
+    // 'adobe sign': { keywords: ['adobe sign', 'adobesign'], legitimateDomains: ['adobe.com', 'adobesign.com'] },
+    // 'paypal': { keywords: ['paypal'], legitimateDomains: ['paypal.com'] },
+};
 
 // ============================================
 // ORGANIZATION IMPERSONATION TARGETS
@@ -283,7 +297,7 @@ let contactsFetched = false;
 // ============================================
 Office.onReady(async (info) => {
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.2.8 starting...');
+        console.log('Email Fraud Detector v3.2.9 starting...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
@@ -507,6 +521,41 @@ function levenshteinDistance(a, b) {
 // ============================================
 // DETECTION FUNCTIONS
 // ============================================
+
+/**
+ * Detect brand impersonation based on email CONTENT (body/subject)
+ * This is separate from org impersonation which only checks display name
+ */
+function detectBrandImpersonation(subject, body, senderDomain) {
+    if (!senderDomain) return null;
+    
+    const contentLower = ((subject || '') + ' ' + (body || '')).toLowerCase();
+    const domainLower = senderDomain.toLowerCase();
+    
+    for (const [brandName, config] of Object.entries(BRAND_CONTENT_DETECTION)) {
+        // Check if any brand keyword appears in content
+        const mentionsBrand = config.keywords.some(keyword => 
+            contentLower.includes(keyword.toLowerCase())
+        );
+        
+        if (mentionsBrand) {
+            // Check if sender is from legitimate domain
+            const isLegitimate = config.legitimateDomains.some(legit => 
+                domainLower === legit || domainLower.endsWith(`.${legit}`)
+            );
+            
+            if (!isLegitimate) {
+                return {
+                    brandName: formatEntityName(brandName),
+                    senderDomain: senderDomain,
+                    legitimateDomains: config.legitimateDomains
+                };
+            }
+        }
+    }
+    
+    return null;
+}
 
 /**
  * Detect organization impersonation - ONLY checks display name
@@ -839,7 +888,21 @@ function processEmail(emailData) {
         }
     }
     
-    // 2. Organization Impersonation (display name only)
+    // 2. Brand Impersonation (content-based - checks body/subject)
+    const brandImpersonation = detectBrandImpersonation(emailData.subject, emailData.body, senderDomain);
+    if (brandImpersonation) {
+        warnings.push({
+            type: 'brand-impersonation',
+            severity: 'critical',
+            title: 'Brand Impersonation Suspected',
+            description: `This email references ${brandImpersonation.brandName} but was not sent from a verified ${brandImpersonation.brandName} domain.`,
+            senderEmail: senderEmail,
+            brandClaimed: brandImpersonation.brandName,
+            legitimateDomains: brandImpersonation.legitimateDomains
+        });
+    }
+    
+    // 3. Organization Impersonation (display name only)
     if (!isTrustedDomain(senderDomain)) {
         const orgImpersonation = detectOrganizationImpersonation(displayName, senderDomain);
         if (orgImpersonation) {
@@ -855,7 +918,7 @@ function processEmail(emailData) {
         }
     }
     
-    // 3. Deceptive TLD
+    // 4. Deceptive TLD
     const deceptiveTld = detectDeceptiveTLD(senderDomain);
     if (deceptiveTld) {
         warnings.push({
@@ -868,7 +931,7 @@ function processEmail(emailData) {
         });
     }
     
-    // 4. Suspicious Domain
+    // 5. Suspicious Domain
     const suspiciousDomain = detectSuspiciousDomain(senderDomain);
     if (suspiciousDomain) {
         warnings.push({
@@ -881,7 +944,7 @@ function processEmail(emailData) {
         });
     }
     
-    // 5. Display Name Suspicion
+    // 6. Display Name Suspicion
     if (!isKnownContact) {
         const displaySuspicion = detectSuspiciousDisplayName(displayName, senderDomain);
         if (displaySuspicion) {
@@ -896,7 +959,7 @@ function processEmail(emailData) {
         }
     }
     
-    // 6. Display Name Impersonation (trusted domains)
+    // 7. Display Name Impersonation (trusted domains)
     if (!isKnownContact) {
         const impersonation = detectDisplayNameImpersonation(displayName, senderDomain);
         if (impersonation) {
@@ -911,7 +974,7 @@ function processEmail(emailData) {
         }
     }
     
-    // 7. Homoglyphs
+    // 8. Homoglyphs
     const homoglyph = detectHomoglyphs(senderEmail);
     if (homoglyph) {
         warnings.push({
@@ -924,7 +987,7 @@ function processEmail(emailData) {
         });
     }
     
-    // 8. Lookalike Domain
+    // 9. Lookalike Domain
     const lookalike = detectLookalikeDomain(senderDomain);
     if (lookalike) {
         warnings.push({
@@ -937,7 +1000,7 @@ function processEmail(emailData) {
         });
     }
     
-    // 9. Wire Fraud Keywords
+    // 10. Wire Fraud Keywords
     const wireKeywords = detectWireFraudKeywords(content);
     if (wireKeywords.length > 0) {
         const keywordInfo = getKeywordExplanation(wireKeywords[0]);
@@ -952,7 +1015,7 @@ function processEmail(emailData) {
         });
     }
     
-    // 10. Contact Lookalike (only if contacts were loaded)
+    // 11. Contact Lookalike (only if contacts were loaded)
     if (!isKnownContact && knownContacts.size > 0) {
         const contactLookalike = detectContactLookalike(senderEmail);
         if (contactLookalike) {
@@ -1052,6 +1115,23 @@ function displayResults(warnings) {
                         <div class="warning-email-row">
                             <span class="warning-email-label">Claims to be:</span>
                             <span class="warning-email-value known">${w.entityClaimed}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Actually from:</span>
+                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Legitimate domains:</span>
+                            <span class="warning-email-value known">${w.legitimateDomains.join(', ')}</span>
+                        </div>
+                    </div>
+                `;
+            } else if (w.type === 'brand-impersonation') {
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Claims to be:</span>
+                            <span class="warning-email-value known">${w.brandClaimed}</span>
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">Actually from:</span>
