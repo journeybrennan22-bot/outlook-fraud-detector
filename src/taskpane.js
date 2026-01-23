@@ -52,7 +52,7 @@ const BRAND_CONTENT_DETECTION = {
         legitimateDomains: ['docusign.com', 'docusign.net']
     },
     'microsoft': {
-        keywords: ['microsoft 365', 'office 365', 'sharepoint', 'onedrive', 'microsoft account', 'microsoft teams'],
+        keywords: ['microsoft 365', 'microsoft-365', 'office 365', 'office-365', 'sharepoint', 'onedrive', 'microsoft account', 'microsoft teams'],
         legitimateDomains: ['microsoft.com', 'office.com', 'sharepoint.com', 'onedrive.com', 'live.com', 'outlook.com', 'office365.com']
     },
     'google': {
