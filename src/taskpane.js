@@ -867,6 +867,8 @@ function processEmail(emailData) {
     const displayName = emailData.from.displayName || '';
     const senderDomain = senderEmail.split('@')[1] || '';
     const content = (emailData.subject || '') + ' ' + (emailData.body || '');
+    console.log('CONTENT SCANNED:', content.substring(0, 1000));
+    console.log('SENDER DOMAIN:', senderDomain);
     const replyTo = emailData.replyTo;
     
     const isKnownContact = knownContacts.has(senderEmail);
