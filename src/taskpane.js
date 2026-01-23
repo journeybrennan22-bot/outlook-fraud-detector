@@ -528,10 +528,8 @@ function levenshteinDistance(a, b) {
  */
 function detectBrandImpersonation(subject, body, senderDomain) {
     console.log('BRAND CHECK CALLED - Domain:', senderDomain);
-    if (!senderDomain) return null;
     
     const contentLower = ((subject || '') + ' ' + (body || '')).toLowerCase();
-    const domainLower = senderDomain.toLowerCase();
     
     console.log('BRAND CHECK - Contains docusign:', contentLower.includes('docusign'));
     
@@ -544,6 +542,18 @@ function detectBrandImpersonation(subject, body, senderDomain) {
         console.log('BRAND CHECK -', brandName, '- mentionsBrand:', mentionsBrand);
         
         if (mentionsBrand) {
+            // If no valid domain at all, that's VERY suspicious
+            if (!senderDomain) {
+                console.log('BRAND CHECK - No valid sender domain, flagging as suspicious');
+                return {
+                    brandName: formatEntityName(brandName),
+                    senderDomain: '(invalid or hidden sender)',
+                    legitimateDomains: config.legitimateDomains
+                };
+            }
+            
+            const domainLower = senderDomain.toLowerCase();
+            
             // Check if sender is from legitimate domain
             const isLegitimate = config.legitimateDomains.some(legit => 
                 domainLower === legit || domainLower.endsWith(`.${legit}`)
