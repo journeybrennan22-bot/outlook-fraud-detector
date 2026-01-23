@@ -50,10 +50,47 @@ const BRAND_CONTENT_DETECTION = {
     'docusign': {
         keywords: ['docusign'],
         legitimateDomains: ['docusign.com', 'docusign.net']
+    },
+    'microsoft': {
+        keywords: ['microsoft 365', 'office 365', 'sharepoint', 'onedrive', 'microsoft account', 'microsoft teams'],
+        legitimateDomains: ['microsoft.com', 'office.com', 'sharepoint.com', 'onedrive.com', 'live.com', 'outlook.com', 'office365.com']
+    },
+    'google': {
+        keywords: ['google drive', 'google docs', 'google account', 'google workspace'],
+        legitimateDomains: ['google.com', 'gmail.com', 'googlemail.com']
+    },
+    'amazon': {
+        keywords: ['amazon prime', 'amazon account', 'amazon order', 'amazon.com order'],
+        legitimateDomains: ['amazon.com', 'amazon.co.uk', 'amazon.ca', 'amazonses.com']
+    },
+    'paypal': {
+        keywords: ['paypal'],
+        legitimateDomains: ['paypal.com']
+    },
+    'netflix': {
+        keywords: ['netflix'],
+        legitimateDomains: ['netflix.com']
+    },
+    'adobe sign': {
+        keywords: ['adobe sign', 'adobesign'],
+        legitimateDomains: ['adobe.com', 'adobesign.com', 'echosign.com']
+    },
+    'dropbox': {
+        keywords: ['dropbox', 'dropbox sign', 'hellosign'],
+        legitimateDomains: ['dropbox.com', 'hellosign.com', 'dropboxmail.com']
+    },
+    'apple': {
+        keywords: ['apple id', 'icloud account', 'apple account'],
+        legitimateDomains: ['apple.com', 'icloud.com']
+    },
+    'facebook': {
+        keywords: ['facebook account', 'meta account', 'facebook security'],
+        legitimateDomains: ['facebook.com', 'meta.com', 'facebookmail.com']
+    },
+    'linkedin': {
+        keywords: ['linkedin account', 'linkedin invitation', 'linkedin message'],
+        legitimateDomains: ['linkedin.com']
     }
-    // Future brands can be added here:
-    // 'adobe sign': { keywords: ['adobe sign', 'adobesign'], legitimateDomains: ['adobe.com', 'adobesign.com'] },
-    // 'paypal': { keywords: ['paypal'], legitimateDomains: ['paypal.com'] },
 };
 
 // ============================================
@@ -297,7 +334,7 @@ let contactsFetched = false;
 // ============================================
 Office.onReady(async (info) => {
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.2.9 starting...');
+        console.log('Email Fraud Detector v3.3.0 starting...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
