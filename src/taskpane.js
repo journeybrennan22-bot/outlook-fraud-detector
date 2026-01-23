@@ -870,7 +870,10 @@ async function analyzeCurrentEmail() {
 }
 
 function processEmail(emailData) {
+    console.log('EMAIL DATA FROM:', emailData.from);
+    console.log('EMAIL DATA FROM EMAIL:', emailData.from?.emailAddress);
     const senderEmail = emailData.from.emailAddress.toLowerCase();
+    console.log('SENDER EMAIL EXTRACTED:', senderEmail);
     const displayName = emailData.from.displayName || '';
     const senderDomain = senderEmail.split('@')[1] || '';
     const content = (emailData.subject || '') + ' ' + (emailData.body || '');
