@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.2.9 - Added brand impersonation detection (content-based)
+// Version 3.4.0 - Expanded brand impersonation detection (23 brands)
 
 // ============================================
 // CONFIGURATION
@@ -90,6 +90,55 @@ const BRAND_CONTENT_DETECTION = {
     'linkedin': {
         keywords: ['linkedin account', 'linkedin invitation', 'linkedin message'],
         legitimateDomains: ['linkedin.com']
+    },
+    // NEW BRANDS ADDED - v3.4.0
+    'yahoo': {
+        keywords: ['yahoo account', 'yahoo mail', 'yahoo security'],
+        legitimateDomains: ['yahoo.com', 'yahoomail.com']
+    },
+    'mcafee': {
+        keywords: ['mcafee'],
+        legitimateDomains: ['mcafee.com']
+    },
+    'coinbase': {
+        keywords: ['coinbase'],
+        legitimateDomains: ['coinbase.com']
+    },
+    'dhl': {
+        keywords: ['dhl express', 'dhl shipment', 'dhl delivery', 'dhl package'],
+        legitimateDomains: ['dhl.com', 'dhl.de']
+    },
+    'fedex': {
+        keywords: ['fedex', 'federal express'],
+        legitimateDomains: ['fedex.com']
+    },
+    'ups': {
+        keywords: ['ups package', 'ups delivery', 'ups shipment', 'united parcel'],
+        legitimateDomains: ['ups.com']
+    },
+    'usps': {
+        keywords: ['usps', 'postal service', 'usps delivery', 'usps package'],
+        legitimateDomains: ['usps.com']
+    },
+    'zelle': {
+        keywords: ['zelle'],
+        legitimateDomains: ['zellepay.com', 'zelle.com']
+    },
+    'venmo': {
+        keywords: ['venmo'],
+        legitimateDomains: ['venmo.com']
+    },
+    'cashapp': {
+        keywords: ['cash app', 'cashapp'],
+        legitimateDomains: ['cash.app', 'square.com', 'squareup.com']
+    },
+    'quickbooks': {
+        keywords: ['quickbooks', 'intuit'],
+        legitimateDomains: ['intuit.com', 'quickbooks.com']
+    },
+    'zoom': {
+        keywords: ['zoom meeting', 'zoom invitation', 'zoom account'],
+        legitimateDomains: ['zoom.us', 'zoom.com']
     }
 };
 
@@ -334,7 +383,7 @@ let contactsFetched = false;
 // ============================================
 Office.onReady(async (info) => {
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.3.0 starting...');
+        console.log('Email Fraud Detector v3.4.0 starting...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
