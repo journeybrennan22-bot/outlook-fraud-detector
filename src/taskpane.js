@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.4.1 - Added teams.mail.microsoft to legitimate domains
+// Version 3.4.2 - Clearer display name impersonation warning
 
 // ============================================
 // CONFIGURATION
@@ -1251,9 +1251,21 @@ function displayResults(warnings) {
                         </div>
                     </div>
                 `;
+            } else if (w.type === 'impersonation') {
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">This email claims to be from:</span>
+                            <span class="warning-email-value known">${w.matchedEmail}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">But is actually from:</span>
+                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                        </div>
+                    </div>
+                `;
             } else if (w.senderEmail && w.matchedEmail) {
-                const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : 
-                                   w.type === 'impersonation' ? 'Display name shows' : 'Similar to';
+                const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : 'Similar to';
                 emailHtml = `
                     <div class="warning-emails">
                         <div class="warning-email-row">
