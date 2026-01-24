@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.4.0 - Expanded brand impersonation detection (23 brands)
+// Version 3.4.1 - Added teams.mail.microsoft to legitimate domains
 
 // ============================================
 // CONFIGURATION
@@ -53,7 +53,7 @@ const BRAND_CONTENT_DETECTION = {
     },
     'microsoft': {
         keywords: ['microsoft 365', 'microsoft-365', 'office 365', 'office-365', 'sharepoint', 'onedrive', 'microsoft account', 'microsoft teams'],
-        legitimateDomains: ['microsoft.com', 'office.com', 'sharepoint.com', 'onedrive.com', 'live.com', 'outlook.com', 'office365.com']
+        legitimateDomains: ['microsoft.com', 'office.com', 'sharepoint.com', 'onedrive.com', 'live.com', 'outlook.com', 'office365.com', 'teams.mail.microsoft']
     },
     'google': {
         keywords: ['google drive', 'google docs', 'google account', 'google workspace'],
