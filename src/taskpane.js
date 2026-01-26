@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.4.2 - Clearer display name impersonation warning
+// Version 3.5.0 - Added: recipient spoofing, phishing urgency, gibberish domain detection
 
 // ============================================
 // CONFIGURATION
@@ -12,7 +12,6 @@ const CONFIG = {
 };
 
 // Suspicious words commonly used in fake domains
-// REMOVED: 'team' (too common in legitimate business names)
 const SUSPICIOUS_DOMAIN_WORDS = [
     'secure', 'security', 'verify', 'verification', 'login', 'signin', 'signon',
     'alert', 'alerts', 'support', 'helpdesk', 'service', 'services',
@@ -34,7 +33,6 @@ const SUSPICIOUS_DISPLAY_PATTERNS = [
 ];
 
 // Deceptive TLDs that look like .com but aren't
-// REMOVED: '.co' (legitimate Colombia TLD)
 const DECEPTIVE_TLDS = [
     '.com.co', '.com.br', '.com.mx', '.com.ar', '.com.au', '.com.ng',
     '.com.pk', '.com.ph', '.com.ua', '.com.ve', '.com.vn', '.com.tr',
@@ -43,8 +41,40 @@ const DECEPTIVE_TLDS = [
 ];
 
 // ============================================
+// NEW v3.5.0: PHISHING URGENCY KEYWORDS
+// Different from wire fraud - these are account/deletion threats
+// ============================================
+const PHISHING_URGENCY_KEYWORDS = [
+    // Account threats
+    'account locked', 'account suspended', 'account disabled',
+    'account will be', 'account has been',
+    'access suspended', 'access revoked', 'access denied',
+    // Deletion threats
+    'will be deleted', 'scheduled for deletion', 'permanently removed',
+    'permanently deleted', 'files will be lost', 'data will be erased',
+    'photos will be deleted', 'videos will be deleted',
+    // Storage/limit scams
+    'storage limit', 'storage full', 'critical limit',
+    'quota exceeded', 'mailbox full', 'inbox full',
+    // Urgency phrases
+    'final notice', 'final warning', 'last chance',
+    'immediate action', 'act immediately',
+    'expires today', 'expires soon',
+    'within 24 hours', 'within 48 hours',
+    // Verification scams
+    'verify your account', 'confirm your identity',
+    'verify your email', 'verify your information',
+    'update your payment', 'payment failed', 'payment declined',
+    'billing problem', 'billing issue',
+    // Subscription scams
+    'subscription expired', 'renew your subscription',
+    'membership expired', 'unable to renew',
+    // Block threats
+    'we\'ve blocked', 'has been blocked', 'temporarily blocked'
+];
+
+// ============================================
 // BRAND IMPERSONATION DETECTION (CONTENT-BASED)
-// Scans email body/subject for brand mentions, verifies sender domain
 // ============================================
 const BRAND_CONTENT_DETECTION = {
     'docusign': {
@@ -91,7 +121,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['linkedin account', 'linkedin invitation', 'linkedin message'],
         legitimateDomains: ['linkedin.com']
     },
-    // NEW BRANDS ADDED - v3.4.0
     'yahoo': {
         keywords: ['yahoo account', 'yahoo mail', 'yahoo security'],
         legitimateDomains: ['yahoo.com', 'yahoomail.com']
@@ -144,8 +173,6 @@ const BRAND_CONTENT_DETECTION = {
 
 // ============================================
 // ORGANIZATION IMPERSONATION TARGETS
-// Maps commonly impersonated entities to their legitimate domains
-// Only checks DISPLAY NAME (not subject/body to avoid false positives)
 // ============================================
 const IMPERSONATION_TARGETS = {
     // US Government - Federal
@@ -190,7 +217,7 @@ const IMPERSONATION_TARGETS = {
     "federal express": ["fedex.com"],
     "dhl": ["dhl.com"],
 
-    // Major Banks - Full names only (not standalone like "chase")
+    // Major Banks
     "wells fargo": ["wellsfargo.com", "wf.com", "notify.wellsfargo.com"],
     "bank of america": ["bankofamerica.com", "bofa.com"],
     "chase bank": ["chase.com", "jpmorganchase.com"],
@@ -214,7 +241,7 @@ const IMPERSONATION_TARGETS = {
     "navy federal credit union": ["navyfederal.org"],
     "usaa": ["usaa.com"],
 
-    // Tech Companies - PHRASES ONLY (not standalone words)
+    // Tech Companies - PHRASES ONLY
     "microsoft support": ["microsoft.com"],
     "microsoft account": ["microsoft.com", "live.com"],
     "microsoft security": ["microsoft.com"],
@@ -382,12 +409,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
+    console.log('Email Fraud Detector v3.5.0 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.4.0 starting...');
+        console.log('Email Fraud Detector v3.5.0 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
+        console.log('Email Fraud Detector v3.5.0 ready');
     }
 });
 
@@ -405,7 +434,6 @@ async function initializeMsal() {
     };
     msalInstance = new msal.PublicClientApplication(msalConfig);
     
-    // CRITICAL: Clear any stuck interaction state from previous sessions
     try {
         await msalInstance.handleRedirectPromise();
         console.log('MSAL initialized, cleared any pending auth');
@@ -452,14 +480,12 @@ async function getAccessToken() {
     
     try {
         if (accounts.length > 0) {
-            // Try silent auth first
             const response = await msalInstance.acquireTokenSilent({
                 scopes: CONFIG.scopes,
                 account: accounts[0]
             });
             return response.accessToken;
         } else {
-            // Need interactive auth - guard against multiple attempts
             authInProgress = true;
             try {
                 const response = await msalInstance.acquireTokenPopup({
@@ -476,7 +502,6 @@ async function getAccessToken() {
         console.log('Auth error:', error);
         authInProgress = false;
         
-        // If interaction_in_progress, try to clear it
         if (error.errorCode === 'interaction_in_progress') {
             console.log('Clearing stuck auth state...');
             try {
@@ -490,9 +515,6 @@ async function getAccessToken() {
     }
 }
 
-/**
- * Fetch contacts from Microsoft Graph (contacts only - fast)
- */
 async function fetchContacts(token) {
     const contacts = [];
     
@@ -531,16 +553,13 @@ async function fetchContacts(token) {
     return contacts;
 }
 
-/**
- * Fetch contacts and add current user email
- */
 async function fetchAllKnownContacts() {
-    if (contactsFetched) return; // Don't retry if already attempted
+    if (contactsFetched) return;
     
     const token = await getAccessToken();
     if (!token) {
         console.log('No token available, continuing without contacts');
-        contactsFetched = true; // Mark as attempted
+        contactsFetched = true;
         return;
     }
     
@@ -548,10 +567,8 @@ async function fetchAllKnownContacts() {
     
     const contacts = await fetchContacts(token);
     
-    // Add all to the knownContacts set
     contacts.forEach(e => knownContacts.add(e));
     
-    // Add current user's email so lookalikes of their own address are detected
     if (currentUserEmail) {
         knownContacts.add(currentUserEmail.toLowerCase());
     }
@@ -609,28 +626,157 @@ function levenshteinDistance(a, b) {
 // ============================================
 
 /**
- * Detect brand impersonation based on email CONTENT (body/subject)
- * This is separate from org impersonation which only checks display name
+ * NEW v3.5.0: Detect recipient self-spoofing
+ * Catches when display name matches the recipient's own email/name
+ */
+function detectRecipientSpoofing(displayName, senderEmail) {
+    if (!displayName || !currentUserEmail) return null;
+    
+    const displayLower = displayName.toLowerCase().trim();
+    const recipientLower = currentUserEmail.toLowerCase();
+    const recipientUsername = recipientLower.split('@')[0];
+    
+    // Clean display name and recipient (remove dots, underscores, spaces)
+    const displayCleaned = displayLower.replace(/[\.\-_\s]/g, '');
+    const recipientCleaned = recipientUsername.replace(/[\.\-_\s]/g, '');
+    
+    // Check if display name contains recipient's username (or vice versa)
+    if (displayCleaned.length >= 4 && recipientCleaned.length >= 4) {
+        if (displayCleaned.includes(recipientCleaned) || recipientCleaned.includes(displayCleaned)) {
+            // Make sure it's not actually FROM the recipient
+            const senderLower = senderEmail.toLowerCase();
+            if (!senderLower.includes(recipientUsername)) {
+                return {
+                    displayName: displayName,
+                    recipientEmail: currentUserEmail
+                };
+            }
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * NEW v3.5.0: Detect phishing urgency keywords
+ * Different from wire fraud - focuses on account threats
+ */
+function detectPhishingUrgency(bodyText, subject) {
+    if (!bodyText && !subject) return null;
+    
+    const textToCheck = ((subject || '') + ' ' + (bodyText || '')).toLowerCase();
+    const foundKeywords = [];
+    
+    for (const keyword of PHISHING_URGENCY_KEYWORDS) {
+        if (textToCheck.includes(keyword.toLowerCase())) {
+            foundKeywords.push(keyword);
+        }
+    }
+    
+    // Need at least 2 urgency keywords to trigger
+    if (foundKeywords.length >= 2) {
+        return {
+            keywords: foundKeywords.slice(0, 4)
+        };
+    }
+    
+    return null;
+}
+
+/**
+ * NEW v3.5.0: Detect gibberish domain
+ * Uses scoring system to avoid false positives
+ */
+function detectGibberishDomain(email) {
+    if (!email) return null;
+    
+    const parts = email.split('@');
+    if (parts.length !== 2) return null;
+    
+    const domain = parts[1].toLowerCase();
+    const domainParts = domain.split('.');
+    if (domainParts.length < 2) return null;
+    
+    const mainPart = domainParts[0];
+    
+    let suspicionScore = 0;
+    const reasons = [];
+    
+    // Check 1: High digit ratio in main domain part
+    if (mainPart.length > 5) {
+        const digitCount = (mainPart.match(/\d/g) || []).length;
+        const digitRatio = digitCount / mainPart.length;
+        if (digitRatio > 0.3) {
+            suspicionScore += 2;
+            reasons.push('high number ratio');
+        }
+    }
+    
+    // Check 2: Multiple random-looking subdomains
+    if (domainParts.length >= 3) {
+        let gibberishSubdomains = 0;
+        const subdomains = domainParts.slice(0, -1);
+        
+        for (const sub of subdomains) {
+            const hasDigits = /\d/.test(sub);
+            const hasLetters = /[a-z]/i.test(sub);
+            const isShortAndRandom = sub.length > 4 && hasDigits && hasLetters;
+            const containsNoWords = !/(mail|web|app|api|www|cdn|img|static|secure|login|account|cloud|storage)/i.test(sub);
+            
+            if (isShortAndRandom && containsNoWords) {
+                gibberishSubdomains++;
+            }
+        }
+        
+        if (gibberishSubdomains >= 2) {
+            suspicionScore += 3;
+            reasons.push('multiple random subdomains');
+        }
+    }
+    
+    // Check 3: Suspicious TLD combined with other signals
+    const suspiciousTLDs = ['.us', '.tk', '.ml', '.ga', '.cf', '.gq', '.pw', '.cc', '.ws', '.top', '.xyz', '.buzz'];
+    const tld = '.' + domainParts[domainParts.length - 1];
+    if (suspiciousTLDs.includes(tld) && suspicionScore > 0) {
+        suspicionScore += 1;
+        reasons.push('suspicious TLD (' + tld + ')');
+    }
+    
+    // Check 4: No vowels in main domain part
+    if (mainPart.length > 6) {
+        const vowelCount = (mainPart.match(/[aeiou]/gi) || []).length;
+        if (vowelCount === 0) {
+            suspicionScore += 2;
+            reasons.push('no vowels in domain');
+        }
+    }
+    
+    // Need score of 3+ to trigger
+    if (suspicionScore >= 3) {
+        return {
+            domain: domain,
+            reasons: reasons
+        };
+    }
+    
+    return null;
+}
+
+/**
+ * Detect brand impersonation based on email CONTENT
  */
 function detectBrandImpersonation(subject, body, senderDomain) {
     console.log('BRAND CHECK CALLED - Domain:', senderDomain);
     
     const contentLower = ((subject || '') + ' ' + (body || '')).toLowerCase();
     
-    console.log('BRAND CHECK - Contains docusign:', contentLower.includes('docusign'));
-    
     for (const [brandName, config] of Object.entries(BRAND_CONTENT_DETECTION)) {
-        // Check if any brand keyword appears in content
         const mentionsBrand = config.keywords.some(keyword => 
             contentLower.includes(keyword.toLowerCase())
         );
         
-        console.log('BRAND CHECK -', brandName, '- mentionsBrand:', mentionsBrand);
-        
         if (mentionsBrand) {
-            // If no valid domain at all, that's VERY suspicious
             if (!senderDomain) {
-                console.log('BRAND CHECK - No valid sender domain, flagging as suspicious');
                 return {
                     brandName: formatEntityName(brandName),
                     senderDomain: '(invalid or hidden sender)',
@@ -639,13 +785,9 @@ function detectBrandImpersonation(subject, body, senderDomain) {
             }
             
             const domainLower = senderDomain.toLowerCase();
-            
-            // Check if sender is from legitimate domain
             const isLegitimate = config.legitimateDomains.some(legit => 
                 domainLower === legit || domainLower.endsWith(`.${legit}`)
             );
-            
-            console.log('BRAND CHECK -', brandName, '- isLegitimate:', isLegitimate, '- domain:', domainLower);
             
             if (!isLegitimate) {
                 return {
@@ -706,13 +848,11 @@ function detectDeceptiveTLD(domain) {
 
 /**
  * Detect suspicious domain patterns
- * Only flags hyphenated domains if they contain suspicious words
  */
 function detectSuspiciousDomain(domain) {
     const domainLower = domain.toLowerCase();
     const domainName = domainLower.split('.')[0];
     
-    // Only check hyphenated domains if they contain suspicious words
     if (domainName.includes('-')) {
         const parts = domainName.split('-');
         for (const part of parts) {
@@ -725,11 +865,9 @@ function detectSuspiciousDomain(domain) {
                 }
             }
         }
-        // Don't flag ALL hyphenated domains - only those with suspicious words
         return null;
     }
     
-    // Check for suspicious words as suffixes in non-hyphenated domains
     for (const word of SUSPICIOUS_DOMAIN_WORDS) {
         if (domainName.endsWith(word) && domainName !== word && domainName.length > word.length + 3) {
             return {
@@ -743,7 +881,7 @@ function detectSuspiciousDomain(domain) {
 }
 
 /**
- * Detect suspicious display names - only high-risk words from generic domains
+ * Detect suspicious display names
  */
 function detectSuspiciousDisplayName(displayName, senderDomain) {
     if (!displayName) return null;
@@ -759,7 +897,6 @@ function detectSuspiciousDisplayName(displayName, senderDomain) {
     
     const isGenericDomain = genericDomains.includes(domainLower);
     
-    // Only flag high-risk words from generic domains
     const companyPatterns = ['security', 'billing', 'account', 'verification', 'fraud alert', 'helpdesk'];
     for (const pattern of companyPatterns) {
         if (nameLower.includes(pattern) && isGenericDomain) {
@@ -819,7 +956,7 @@ function detectHomoglyphs(email) {
 }
 
 /**
- * Detect lookalike domains (similar to trusted domains)
+ * Detect lookalike domains
  */
 function detectLookalikeDomain(domain) {
     for (const trusted of CONFIG.trustedDomains) {
@@ -845,7 +982,7 @@ function detectWireFraudKeywords(content) {
 }
 
 /**
- * Detect contact lookalike - skip if sender is on trusted domain
+ * Detect contact lookalike
  */
 function detectContactLookalike(senderEmail) {
     const parts = senderEmail.toLowerCase().split('@');
@@ -854,7 +991,6 @@ function detectContactLookalike(senderEmail) {
     const senderLocal = parts[0];
     const senderDomain = parts[1];
     
-    // Skip lookalike detection for trusted domains
     if (isTrustedDomain(senderDomain)) return null;
     
     const publicDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 
@@ -871,7 +1007,6 @@ function detectContactLookalike(senderEmail) {
         
         const usernameDiff = levenshteinDistance(senderLocal, contactLocal);
         
-        // Same domain, similar username (1-4 chars different)
         if (senderDomain === contactDomain) {
             if (usernameDiff > 0 && usernameDiff <= 4) {
                 return {
@@ -882,7 +1017,6 @@ function detectContactLookalike(senderEmail) {
             }
         }
         
-        // Different domains - check domain similarity
         const bothPublicSameDomain = publicDomains.includes(senderDomain) && 
                                       senderDomain === contactDomain;
         
@@ -908,22 +1042,17 @@ async function analyzeCurrentEmail() {
     showLoading();
     
     try {
-        // Get current user email
         currentUserEmail = Office.context.mailbox.userProfile.emailAddress;
         
-        // Try to fetch contacts (won't block if auth fails)
         if (knownContacts.size === 0 && !contactsFetched) {
             await fetchAllKnownContacts();
         }
         
-        // Get email data
         const item = Office.context.mailbox.item;
         const from = item.from;
         const subject = item.subject;
         
-        // Get body and headers
         item.body.getAsync(Office.CoercionType.Text, (bodyResult) => {
-            // Try to get Reply-To from internet headers
             if (item.getAllInternetHeadersAsync) {
                 item.getAllInternetHeadersAsync((headerResult) => {
                     let replyTo = null;
@@ -966,22 +1095,65 @@ async function analyzeCurrentEmail() {
 }
 
 function processEmail(emailData) {
-    console.log('EMAIL DATA FROM:', emailData.from);
-    console.log('EMAIL DATA FROM EMAIL:', emailData.from?.emailAddress);
     const senderEmail = emailData.from.emailAddress.toLowerCase();
-    console.log('SENDER EMAIL EXTRACTED:', senderEmail);
     const displayName = emailData.from.displayName || '';
     const senderDomain = senderEmail.split('@')[1] || '';
     const content = (emailData.subject || '') + ' ' + (emailData.body || '');
-    console.log('CONTENT SCANNED:', content.substring(0, 1000));
-    console.log('SENDER DOMAIN:', senderDomain);
     const replyTo = emailData.replyTo;
     
     const isKnownContact = knownContacts.has(senderEmail);
     
     const warnings = [];
     
-    // 1. Reply-To Mismatch (only flag if different domain)
+    // ============================================
+    // NEW v3.5.0 CHECKS (run first - highest priority)
+    // ============================================
+    
+    // Check for recipient self-spoofing
+    const recipientSpoof = detectRecipientSpoofing(displayName, senderEmail);
+    if (recipientSpoof) {
+        warnings.push({
+            type: 'recipient-spoof',
+            severity: 'critical',
+            title: 'Sender Impersonating You',
+            description: 'The sender is using YOUR name as their display name. This is a common phishing tactic.',
+            senderEmail: senderEmail,
+            matchedEmail: recipientSpoof.displayName
+        });
+    }
+    
+    // Check for phishing urgency keywords
+    const phishingUrgency = detectPhishingUrgency(emailData.body, emailData.subject);
+    if (phishingUrgency) {
+        warnings.push({
+            type: 'phishing-urgency',
+            severity: 'critical',
+            title: 'Phishing Language Detected',
+            description: 'This email uses fear tactics commonly found in phishing scams.',
+            keywords: phishingUrgency.keywords,
+            keywordCategory: 'Phishing Tactics',
+            keywordExplanation: 'Scammers use threats of account deletion, suspension, or data loss to pressure you into clicking malicious links. Legitimate companies rarely threaten immediate action via email.'
+        });
+    }
+    
+    // Check for gibberish domain
+    const gibberishDomain = detectGibberishDomain(senderEmail);
+    if (gibberishDomain) {
+        warnings.push({
+            type: 'gibberish-domain',
+            severity: 'critical',
+            title: 'Suspicious Random Domain',
+            description: `This email comes from a domain that appears to be randomly generated (${gibberishDomain.reasons.join(', ')}). Legitimate companies use recognizable domain names.`,
+            senderEmail: senderEmail,
+            matchedEmail: gibberishDomain.domain
+        });
+    }
+
+    // ============================================
+    // EXISTING CHECKS (unchanged)
+    // ============================================
+    
+    // 1. Reply-To Mismatch
     if (replyTo && replyTo.toLowerCase() !== senderEmail) {
         const replyToDomain = replyTo.split('@')[1] || '';
         if (replyToDomain.toLowerCase() !== senderDomain) {
@@ -996,7 +1168,7 @@ function processEmail(emailData) {
         }
     }
     
-    // 2. Brand Impersonation (content-based - checks body/subject)
+    // 2. Brand Impersonation
     const brandImpersonation = detectBrandImpersonation(emailData.subject, emailData.body, senderDomain);
     if (brandImpersonation) {
         warnings.push({
@@ -1010,7 +1182,7 @@ function processEmail(emailData) {
         });
     }
     
-    // 3. Organization Impersonation (display name only)
+    // 3. Organization Impersonation
     if (!isTrustedDomain(senderDomain)) {
         const orgImpersonation = detectOrganizationImpersonation(displayName, senderDomain);
         if (orgImpersonation) {
@@ -1067,7 +1239,7 @@ function processEmail(emailData) {
         }
     }
     
-    // 7. Display Name Impersonation (trusted domains)
+    // 7. Display Name Impersonation
     if (!isKnownContact) {
         const impersonation = detectDisplayNameImpersonation(displayName, senderDomain);
         if (impersonation) {
@@ -1123,7 +1295,7 @@ function processEmail(emailData) {
         });
     }
     
-    // 11. Contact Lookalike (only if contacts were loaded)
+    // 11. Contact Lookalike
     if (!isKnownContact && knownContacts.size > 0) {
         const contactLookalike = detectContactLookalike(senderEmail);
         if (contactLookalike) {
@@ -1139,7 +1311,6 @@ function processEmail(emailData) {
         }
     }
     
-    // Display results
     displayResults(warnings);
 }
 
@@ -1166,11 +1337,9 @@ function displayResults(warnings) {
     document.getElementById('error').classList.add('hidden');
     document.getElementById('results').classList.remove('hidden');
     
-    // Count warnings by severity
     const criticalCount = warnings.filter(w => w.severity === 'critical').length;
     const mediumCount = warnings.filter(w => w.severity === 'medium').length;
     
-    // Set body background and status badge
     document.body.classList.remove('status-critical', 'status-medium', 'status-info', 'status-safe');
     
     const statusBadge = document.getElementById('status-badge');
@@ -1190,7 +1359,6 @@ function displayResults(warnings) {
         statusText.textContent = 'No Issues Detected';
     }
     
-    // Display warnings
     const warningsSection = document.getElementById('warnings-section');
     const warningsList = document.getElementById('warnings-list');
     const warningsFooter = document.getElementById('warnings-footer');
@@ -1204,7 +1372,7 @@ function displayResults(warnings) {
         warningsList.innerHTML = warnings.map(w => {
             let emailHtml = '';
             
-            if (w.type === 'wire-fraud' && w.keywords) {
+            if ((w.type === 'wire-fraud' || w.type === 'phishing-urgency') && w.keywords) {
                 const keywordTags = w.keywords.slice(0, 5).map(k => 
                     `<span class="keyword-tag">${k}</span>`
                 ).join('');
@@ -1264,8 +1432,21 @@ function displayResults(warnings) {
                         </div>
                     </div>
                 `;
+            } else if (w.type === 'recipient-spoof') {
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Display name shows:</span>
+                            <span class="warning-email-value suspicious">${w.matchedEmail}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">But actually from:</span>
+                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                        </div>
+                    </div>
+                `;
             } else if (w.senderEmail && w.matchedEmail) {
-                const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : 'Similar to';
+                const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : w.type === 'gibberish-domain' ? 'Domain' : 'Similar to';
                 emailHtml = `
                     <div class="warning-emails">
                         <div class="warning-email-row">
@@ -1274,7 +1455,7 @@ function displayResults(warnings) {
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">${matchLabel}:</span>
-                            <span class="warning-email-value known">${w.matchedEmail}</span>
+                            <span class="warning-email-value ${w.type === 'gibberish-domain' ? 'suspicious' : 'known'}">${w.matchedEmail}</span>
                         </div>
                         ${w.reason ? `<div class="warning-reason">${w.reason}</div>` : ''}
                     </div>
