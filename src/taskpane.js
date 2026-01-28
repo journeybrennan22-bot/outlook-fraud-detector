@@ -1237,7 +1237,7 @@ function processEmail(emailData) {
             type: 'brand-impersonation',
             severity: 'critical',
             title: 'Brand Impersonation Suspected',
-            description: `This email references ${brandImpersonation.brandName} but was not sent from a verified ${brandImpersonation.brandName} domain.`,
+            description: `This email references ${brandImpersonation.brandName} but was NOT sent from a verified ${brandImpersonation.brandName} domain.`,
             senderEmail: senderEmail,
             senderDomain: senderDomain,
             brandClaimed: brandImpersonation.brandName,
@@ -1482,11 +1482,11 @@ function displayResults(warnings) {
                     </div>
                 `;
             } else if (w.type === 'brand-impersonation') {
-                // v3.6.0: Simplified single-sentence format
-                const legitDomainsFormatted = w.legitimateDomains.map(d => wrapDomain(d)).join(', ');
+                // v3.6.0: Three-line format
                 emailHtml = `
-                    <div class="warning-brand-summary">
-                        Real ${w.brandClaimed} emails come from ${legitDomainsFormatted} — this came from ${wrapDomain(w.senderDomain)}
+                    <div class="warning-brand-detail">
+                        <div class="warning-brand-line">This email came from <span style="white-space: nowrap;">${w.senderDomain}</span></div>
+                        <div class="warning-brand-line">Real ${w.brandClaimed} emails come from ${formatDomainsList(w.legitimateDomains)}</div>
                     </div>
                 `;
             } else if (w.type === 'international-sender') {
