@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.5.0 - Added: recipient spoofing, phishing urgency, gibberish domain detection
+// Version 3.6.0 - Updated: International sender detection, simplified brand warnings
 
 // ============================================
 // CONFIGURATION
@@ -10,6 +10,58 @@ const CONFIG = {
     scopes: ['User.Read', 'Contacts.Read'],
     trustedDomains: ['baynac.com', 'purelogicescrow.com', 'journeyinsurance.com']
 };
+
+// ============================================
+// COUNTRY CODE TLD LOOKUP
+// Maps country-code TLDs to country names
+// ============================================
+const COUNTRY_CODE_TLDS = {
+    // Compound TLDs (check these first - more specific)
+    '.com.ar': 'Argentina', '.com.au': 'Australia', '.com.br': 'Brazil',
+    '.com.cn': 'China', '.com.co': 'Colombia', '.com.mx': 'Mexico',
+    '.com.ng': 'Nigeria', '.com.pk': 'Pakistan', '.com.ph': 'Philippines',
+    '.com.tr': 'Turkey', '.com.ua': 'Ukraine', '.com.ve': 'Venezuela',
+    '.com.vn': 'Vietnam', '.co.uk': 'United Kingdom', '.co.za': 'South Africa',
+    '.co.in': 'India', '.co.jp': 'Japan', '.co.kr': 'South Korea',
+    '.co.nz': 'New Zealand', '.net.br': 'Brazil', '.net.co': 'Colombia',
+    '.org.br': 'Brazil', '.org.co': 'Colombia', '.org.uk': 'United Kingdom',
+    '.co.uk.com': 'United Kingdom', '.us.com': 'United States',
+    
+    // Single ccTLDs
+    '.ar': 'Argentina', '.au': 'Australia', '.at': 'Austria',
+    '.be': 'Belgium', '.br': 'Brazil', '.ca': 'Canada',
+    '.ch': 'Switzerland', '.cl': 'Chile', '.cn': 'China',
+    '.co': 'Colombia', '.cz': 'Czech Republic', '.de': 'Germany',
+    '.dk': 'Denmark', '.es': 'Spain', '.fi': 'Finland',
+    '.fr': 'France', '.gr': 'Greece', '.hk': 'Hong Kong',
+    '.hu': 'Hungary', '.id': 'Indonesia', '.ie': 'Ireland',
+    '.il': 'Israel', '.in': 'India', '.it': 'Italy',
+    '.jp': 'Japan', '.kr': 'South Korea', '.mx': 'Mexico',
+    '.my': 'Malaysia', '.nl': 'Netherlands', '.no': 'Norway',
+    '.nz': 'New Zealand', '.pe': 'Peru', '.ph': 'Philippines',
+    '.pk': 'Pakistan', '.pl': 'Poland', '.pt': 'Portugal',
+    '.ro': 'Romania', '.ru': 'Russia', '.sa': 'Saudi Arabia',
+    '.se': 'Sweden', '.sg': 'Singapore', '.th': 'Thailand',
+    '.tr': 'Turkey', '.tw': 'Taiwan', '.ua': 'Ukraine',
+    '.uk': 'United Kingdom', '.ve': 'Venezuela', '.vn': 'Vietnam',
+    '.za': 'South Africa', '.ng': 'Nigeria', '.ke': 'Kenya',
+    '.eg': 'Egypt', '.ae': 'United Arab Emirates',
+    
+    // Suspicious/commonly abused TLDs
+    '.tk': 'Tokelau', '.ml': 'Mali', '.ga': 'Gabon',
+    '.cf': 'Central African Republic', '.gq': 'Equatorial Guinea',
+    '.cm': 'Cameroon', '.cc': 'Cocos Islands', '.ws': 'Samoa',
+    '.pw': 'Palau', '.top': 'Generic (often abused)', '.xyz': 'Generic (often abused)',
+    '.buzz': 'Generic (often abused)', '.icu': 'Generic (often abused)'
+};
+
+// TLDs to flag as international senders (subset that warrants warning)
+const INTERNATIONAL_TLDS = [
+    '.com.co', '.com.br', '.com.mx', '.com.ar', '.com.au', '.com.ng',
+    '.com.pk', '.com.ph', '.com.ua', '.com.ve', '.com.vn', '.com.tr',
+    '.net.co', '.net.br', '.org.co', '.co.uk.com', '.us.com',
+    '.cm', '.cc', '.ru', '.cn', '.tk', '.ml', '.ga', '.cf', '.gq', '.pw'
+];
 
 // Suspicious words commonly used in fake domains
 const SUSPICIOUS_DOMAIN_WORDS = [
@@ -30,14 +82,6 @@ const SUSPICIOUS_DISPLAY_PATTERNS = [
     'department', 'official', 'admin', 'administrator',
     'no-reply', 'noreply', 'do not reply', 'automated',
     'urgent', 'important', 'action required', 'immediate'
-];
-
-// Deceptive TLDs that look like .com but aren't
-const DECEPTIVE_TLDS = [
-    '.com.co', '.com.br', '.com.mx', '.com.ar', '.com.au', '.com.ng',
-    '.com.pk', '.com.ph', '.com.ua', '.com.ve', '.com.vn', '.com.tr',
-    '.net.co', '.net.br', '.org.co', '.co.uk.com', '.us.com',
-    '.cm', '.cc', '.ru', '.cn', '.tk', '.ml', '.ga', '.cf'
 ];
 
 // ============================================
@@ -409,14 +453,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v3.5.0 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v3.6.0 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.5.0 initializing for Outlook...');
+        console.log('Email Fraud Detector v3.6.0 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v3.5.0 ready');
+        console.log('Email Fraud Detector v3.6.0 ready');
     }
 });
 
@@ -834,15 +878,33 @@ function detectOrganizationImpersonation(displayName, senderDomain) {
 }
 
 /**
- * Detect deceptive TLDs
+ * v3.6.0: Detect international sender (formerly "deceptive TLD")
+ * Returns country information for foreign domains
  */
-function detectDeceptiveTLD(domain) {
+function detectInternationalSender(domain) {
     const domainLower = domain.toLowerCase();
-    for (const tld of DECEPTIVE_TLDS) {
-        if (domainLower.endsWith(tld)) {
-            return tld;
+    
+    // Check compound TLDs first (more specific)
+    for (const [tld, country] of Object.entries(COUNTRY_CODE_TLDS)) {
+        if (tld.includes('.') && tld.split('.').length > 2) {
+            // This is a compound TLD like .com.br
+            if (domainLower.endsWith(tld)) {
+                // Only flag if it's in our warning list
+                if (INTERNATIONAL_TLDS.some(t => domainLower.endsWith(t))) {
+                    return { tld, country };
+                }
+            }
         }
     }
+    
+    // Then check single ccTLDs
+    for (const tld of INTERNATIONAL_TLDS) {
+        if (domainLower.endsWith(tld)) {
+            const country = COUNTRY_CODE_TLDS[tld] || 'Unknown';
+            return { tld, country };
+        }
+    }
+    
     return null;
 }
 
@@ -1177,6 +1239,7 @@ function processEmail(emailData) {
             title: 'Brand Impersonation Suspected',
             description: `This email references ${brandImpersonation.brandName} but was not sent from a verified ${brandImpersonation.brandName} domain.`,
             senderEmail: senderEmail,
+            senderDomain: senderDomain,
             brandClaimed: brandImpersonation.brandName,
             legitimateDomains: brandImpersonation.legitimateDomains
         });
@@ -1198,16 +1261,18 @@ function processEmail(emailData) {
         }
     }
     
-    // 4. Deceptive TLD
-    const deceptiveTld = detectDeceptiveTLD(senderDomain);
-    if (deceptiveTld) {
+    // 4. International Sender (formerly Deceptive TLD)
+    const internationalSender = detectInternationalSender(senderDomain);
+    if (internationalSender) {
         warnings.push({
-            type: 'deceptive-tld',
-            severity: 'critical',
-            title: 'Deceptive Domain',
-            description: `This domain uses "${deceptiveTld}" which is designed to look like a legitimate .com address.`,
+            type: 'international-sender',
+            severity: 'medium',
+            title: 'International Sender',
+            description: `This email was sent from a domain registered in ${internationalSender.country}.`,
             senderEmail: senderEmail,
-            matchedEmail: deceptiveTld
+            senderDomain: senderDomain,
+            country: internationalSender.country,
+            tld: internationalSender.tld
         });
     }
     
@@ -1332,6 +1397,20 @@ function showError(message) {
     document.body.className = '';
 }
 
+/**
+ * Helper to wrap domain in nowrap span
+ */
+function wrapDomain(domain) {
+    return `<span style="white-space: nowrap;">${domain}</span>`;
+}
+
+/**
+ * Format domains list with proper styling
+ */
+function formatDomainsList(domains) {
+    return domains.map(d => wrapDomain(d)).join(', ');
+}
+
 function displayResults(warnings) {
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('error').classList.add('hidden');
@@ -1394,28 +1473,33 @@ function displayResults(warnings) {
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">Actually from:</span>
-                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                            <span class="warning-email-value suspicious" style="white-space: nowrap;">${w.senderEmail}</span>
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">Legitimate domains:</span>
-                            <span class="warning-email-value known">${w.legitimateDomains.join(', ')}</span>
+                            <span class="warning-email-value known">${formatDomainsList(w.legitimateDomains)}</span>
                         </div>
                     </div>
                 `;
             } else if (w.type === 'brand-impersonation') {
+                // v3.6.0: Simplified single-sentence format
+                const legitDomainsFormatted = w.legitimateDomains.map(d => wrapDomain(d)).join(', ');
+                emailHtml = `
+                    <div class="warning-brand-summary">
+                        Real ${w.brandClaimed} emails come from ${legitDomainsFormatted} — this came from ${wrapDomain(w.senderDomain)}
+                    </div>
+                `;
+            } else if (w.type === 'international-sender') {
+                // v3.6.0: New international sender format
                 emailHtml = `
                     <div class="warning-emails">
                         <div class="warning-email-row">
-                            <span class="warning-email-label">This email claims to be from:</span>
-                            <span class="warning-email-value known">${w.brandClaimed}</span>
+                            <span class="warning-email-label">Sender:</span>
+                            <span class="warning-email-value suspicious" style="white-space: nowrap;">${w.senderEmail}</span>
                         </div>
                         <div class="warning-email-row">
-                            <span class="warning-email-label">But is actually from:</span>
-                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
-                        </div>
-                        <div class="warning-email-row">
-                            <span class="warning-email-label">Legitimate domains:</span>
-                            <span class="warning-email-value known">${w.legitimateDomains.join(', ')}</span>
+                            <span class="warning-email-label">Country:</span>
+                            <span class="warning-email-value">${w.country}</span>
                         </div>
                     </div>
                 `;
@@ -1424,11 +1508,11 @@ function displayResults(warnings) {
                     <div class="warning-emails">
                         <div class="warning-email-row">
                             <span class="warning-email-label">This email claims to be from:</span>
-                            <span class="warning-email-value known">${w.matchedEmail}</span>
+                            <span class="warning-email-value known" style="white-space: nowrap;">${w.matchedEmail}</span>
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">But is actually from:</span>
-                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                            <span class="warning-email-value suspicious" style="white-space: nowrap;">${w.senderEmail}</span>
                         </div>
                     </div>
                 `;
@@ -1441,7 +1525,7 @@ function displayResults(warnings) {
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">But actually from:</span>
-                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                            <span class="warning-email-value suspicious" style="white-space: nowrap;">${w.senderEmail}</span>
                         </div>
                     </div>
                 `;
@@ -1451,11 +1535,11 @@ function displayResults(warnings) {
                     <div class="warning-emails">
                         <div class="warning-email-row">
                             <span class="warning-email-label">Sender:</span>
-                            <span class="warning-email-value suspicious">${w.senderEmail}</span>
+                            <span class="warning-email-value suspicious" style="white-space: nowrap;">${w.senderEmail}</span>
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">${matchLabel}:</span>
-                            <span class="warning-email-value ${w.type === 'gibberish-domain' ? 'suspicious' : 'known'}">${w.matchedEmail}</span>
+                            <span class="warning-email-value ${w.type === 'gibberish-domain' ? 'suspicious' : 'known'}" style="white-space: nowrap;">${w.matchedEmail}</span>
                         </div>
                         ${w.reason ? `<div class="warning-reason">${w.reason}</div>` : ''}
                     </div>
