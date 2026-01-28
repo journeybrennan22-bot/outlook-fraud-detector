@@ -1482,11 +1482,21 @@ function displayResults(warnings) {
                     </div>
                 `;
             } else if (w.type === 'brand-impersonation') {
-                // v3.6.0: Three-line format with spacing
+                // v3.6.0: Three-row format with nowrap domains
                 emailHtml = `
-                    <div class="warning-brand-detail">
-                        <div class="warning-brand-line" style="margin-bottom: 8px;">This email came from <span style="white-space: nowrap;">${w.senderDomain}</span></div>
-                        <div class="warning-brand-line">Real ${w.brandClaimed} emails come from ${formatDomainsList(w.legitimateDomains)}</div>
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">This email claims to be from:</span>
+                            <span class="warning-email-value known">${w.brandClaimed}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">But is actually from:</span>
+                            <span class="warning-email-value suspicious">${wrapDomain(w.senderDomain)}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Legitimate domains:</span>
+                            <span class="warning-email-value known">${formatDomainsList(w.legitimateDomains)}</span>
+                        </div>
                     </div>
                 `;
             } else if (w.type === 'international-sender') {
