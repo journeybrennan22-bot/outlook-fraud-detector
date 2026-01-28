@@ -812,9 +812,6 @@ function detectGibberishDomain(email) {
 function detectBrandImpersonation(subject, body, senderDomain) {
     console.log('BRAND CHECK CALLED - Domain:', senderDomain);
     
-    // Skip brand check for trusted domains (employees can discuss brands freely)
-    if (senderDomain && isTrustedDomain(senderDomain)) return null;
-    
     const contentLower = ((subject || '') + ' ' + (body || '')).toLowerCase();
     
     for (const [brandName, config] of Object.entries(BRAND_CONTENT_DETECTION)) {
