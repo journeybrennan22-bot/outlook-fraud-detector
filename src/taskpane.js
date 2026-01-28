@@ -1482,10 +1482,10 @@ function displayResults(warnings) {
                     </div>
                 `;
             } else if (w.type === 'brand-impersonation') {
-                // v3.6.0: Three-line format
+                // v3.6.0: Three-line format with spacing
                 emailHtml = `
                     <div class="warning-brand-detail">
-                        <div class="warning-brand-line">This email came from <span style="white-space: nowrap;">${w.senderDomain}</span></div>
+                        <div class="warning-brand-line" style="margin-bottom: 8px;">This email came from <span style="white-space: nowrap;">${w.senderDomain}</span></div>
                         <div class="warning-brand-line">Real ${w.brandClaimed} emails come from ${formatDomainsList(w.legitimateDomains)}</div>
                     </div>
                 `;
