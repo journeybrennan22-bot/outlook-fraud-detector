@@ -8,7 +8,7 @@ const CONFIG = {
     clientId: '622f0452-d622-45d1-aab3-3a2026389dd3',
     redirectUri: 'https://journeybrennan22-bot.github.io/outlook-fraud-detector/src/taskpane.html',
     scopes: ['User.Read', 'Contacts.Read'],
-    trustedDomains: ['baynac.com', 'purelogicescrow.com', 'journeyinsurance.com']
+    trustedDomains: []
 };
 
 // ============================================
