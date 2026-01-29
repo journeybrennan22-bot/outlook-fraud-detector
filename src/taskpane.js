@@ -1491,18 +1491,19 @@ function displayResults(warnings) {
         const WARNING_PRIORITY = {
             'replyto-mismatch': 1,
             'impersonation': 2,
-            'contact-lookalike': 3,
-            'brand-impersonation': 4,
-            'org-impersonation': 5,
-            'suspicious-domain': 6,
-            'via-routing': 7,
-            'gibberish-domain': 8,
-            'lookalike-domain': 9,
-            'homoglyph': 10,
-            'display-name-suspicion': 11,
-            'international-sender': 12,
-            'wire-fraud': 13,
-            'phishing-urgency': 14
+            'recipient-spoof': 3,
+            'contact-lookalike': 4,
+            'brand-impersonation': 5,
+            'org-impersonation': 6,
+            'suspicious-domain': 7,
+            'via-routing': 8,
+            'gibberish-domain': 9,
+            'lookalike-domain': 10,
+            'homoglyph': 11,
+            'display-name-suspicion': 12,
+            'international-sender': 13,
+            'wire-fraud': 14,
+            'phishing-urgency': 15
         };
         warnings.sort((a, b) => (WARNING_PRIORITY[a.type] || 99) - (WARNING_PRIORITY[b.type] || 99));
         
