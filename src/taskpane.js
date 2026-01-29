@@ -59,9 +59,12 @@ const COUNTRY_CODE_TLDS = {
 const INTERNATIONAL_TLDS = [
     '.com.co', '.com.br', '.com.mx', '.com.ar', '.com.au', '.com.ng',
     '.com.pk', '.com.ph', '.com.ua', '.com.ve', '.com.vn', '.com.tr',
-    '.net.co', '.net.br', '.org.co', '.co.uk.com', '.us.com',
+    '.net.co', '.net.br', '.org.co', '.us',
     '.cm', '.cc', '.ru', '.cn', '.tk', '.ml', '.ga', '.cf', '.gq', '.pw'
 ];
+
+// Fake country-lookalike TLDs (commercial services mimicking real TLDs)
+const FAKE_COUNTRY_TLDS = ['.us.com', '.co.uk.com', '.eu.com', '.de.com', '.br.com'];
 
 // Suspicious words commonly used in fake domains
 const SUSPICIOUS_DOMAIN_WORDS = [
@@ -915,6 +918,16 @@ function detectSuspiciousDomain(domain) {
     const domainLower = domain.toLowerCase();
     const domainName = domainLower.split('.')[0];
     
+    // Check for fake country-lookalike TLDs first
+    for (const fakeTld of FAKE_COUNTRY_TLDS) {
+        if (domainLower.endsWith(fakeTld)) {
+            return {
+                pattern: fakeTld,
+                reason: `This domain uses ${fakeTld} which mimics legitimate domain endings.`
+            };
+        }
+    }
+    
     if (domainName.includes('-')) {
         const parts = domainName.split('-');
         for (const part of parts) {
@@ -939,7 +952,7 @@ function detectSuspiciousDomain(domain) {
         }
     }
     
-    return null;
+    return null;;
 }
 
 /**
@@ -1268,7 +1281,7 @@ function processEmail(emailData) {
             type: 'international-sender',
             severity: 'medium',
             title: 'International Sender',
-            description: `This email was sent from a domain registered in ${internationalSender.country}.`,
+            description: '',
             senderEmail: senderEmail,
             senderDomain: senderDomain,
             country: internationalSender.country,
@@ -1444,6 +1457,25 @@ function displayResults(warnings) {
     const safeMessage = document.getElementById('safe-message');
     
     if (warnings.length > 0) {
+        // Sort warnings by priority (highest threat first)
+        const WARNING_PRIORITY = {
+            'replyto-mismatch': 1,
+            'impersonation': 2,
+            'contact-lookalike': 3,
+            'brand-impersonation': 4,
+            'org-impersonation': 5,
+            'suspicious-domain': 6,
+            'via-routing': 7,
+            'gibberish-domain': 8,
+            'lookalike-domain': 9,
+            'homoglyph': 10,
+            'display-name-suspicion': 11,
+            'international-sender': 12,
+            'wire-fraud': 13,
+            'phishing-urgency': 14
+        };
+        warnings.sort((a, b) => (WARNING_PRIORITY[a.type] || 99) - (WARNING_PRIORITY[b.type] || 99));
+        
         warningsSection.classList.remove('hidden');
         warningsFooter.classList.remove('hidden');
         safeMessage.classList.add('hidden');
@@ -1500,17 +1532,12 @@ function displayResults(warnings) {
                     </div>
                 `;
             } else if (w.type === 'international-sender') {
-                // v3.6.0: New international sender format
+                // v3.6.0: Simplified international sender format - country on second line
                 emailHtml = `
-                    <div class="warning-emails">
-                        <div class="warning-email-row">
-                            <span class="warning-email-label">Sender:</span>
-                            <span class="warning-email-value suspicious" style="white-space: nowrap;">${w.senderEmail}</span>
-                        </div>
-                        <div class="warning-email-row">
-                            <span class="warning-email-label">Country:</span>
-                            <span class="warning-email-value">${w.country}</span>
-                        </div>
+                    <div class="warning-international-info">
+                        <p>This sender's email address includes a country code: ${w.tld}<br>(${w.country})</p>
+                        <p>Be careful, this could be a phishing attempt.</p>
+                        <p>Most legitimate business emails use .com domains.</p>
                     </div>
                 `;
             } else if (w.type === 'impersonation') {
