@@ -916,7 +916,6 @@ function detectInternationalSender(domain) {
  */
 function detectSuspiciousDomain(domain) {
     const domainLower = domain.toLowerCase();
-    const domainName = domainLower.split('.')[0];
     
     // Check for fake country-lookalike TLDs first
     for (const fakeTld of FAKE_COUNTRY_TLDS) {
@@ -928,8 +927,12 @@ function detectSuspiciousDomain(domain) {
         }
     }
     
-    if (domainName.includes('-')) {
-        const parts = domainName.split('-');
+    // Get the registrable domain (the part someone can register, not subdomains)
+    // e.g., "mailcenter.usaa.com" -> "usaa", "secure-login.co.uk" -> "secure-login"
+    const registrableName = getRegistrableDomainName(domainLower);
+    
+    if (registrableName.includes('-')) {
+        const parts = registrableName.split('-');
         for (const part of parts) {
             for (const word of SUSPICIOUS_DOMAIN_WORDS) {
                 if (part === word) {
@@ -944,7 +947,7 @@ function detectSuspiciousDomain(domain) {
     }
     
     for (const word of SUSPICIOUS_DOMAIN_WORDS) {
-        if (domainName.endsWith(word) && domainName !== word && domainName.length > word.length + 3) {
+        if (registrableName.endsWith(word) && registrableName !== word && registrableName.length > word.length + 3) {
             return {
                 pattern: word,
                 reason: `Domain ends with "${word}" which is commonly used in phishing attacks`
@@ -952,7 +955,34 @@ function detectSuspiciousDomain(domain) {
         }
     }
     
-    return null;;
+    return null;
+}
+
+/**
+ * Extract the registrable domain name (without TLD) from a full domain
+ * e.g., "mailcenter.usaa.com" -> "usaa", "secure-login.co.uk" -> "secure-login"
+ */
+function getRegistrableDomainName(domain) {
+    const compoundTlds = ['.co.uk', '.co.za', '.co.in', '.co.jp', '.co.kr', '.co.nz', 
+                         '.com.ar', '.com.au', '.com.br', '.com.cn', '.com.co', '.com.mx',
+                         '.com.ng', '.com.pk', '.com.ph', '.com.tr', '.com.ua', '.com.ve', '.com.vn',
+                         '.net.br', '.net.co', '.org.br', '.org.co', '.org.uk'];
+    
+    // Check for compound TLDs first
+    for (const tld of compoundTlds) {
+        if (domain.endsWith(tld)) {
+            const withoutTld = domain.slice(0, -tld.length);
+            const parts = withoutTld.split('.');
+            return parts[parts.length - 1];
+        }
+    }
+    
+    // Standard TLD - get the second-to-last part
+    const parts = domain.split('.');
+    if (parts.length >= 2) {
+        return parts[parts.length - 2];
+    }
+    return parts[0];
 }
 
 /**
