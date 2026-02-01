@@ -1655,8 +1655,8 @@ function displayResults(warnings) {
                 emailHtml = `
                     <div class="warning-international-info">
                         <p>This sender's email address includes a country code: ${w.tld}<br>(${w.country})</p>
-                        <p>Be careful, this could be a phishing attempt.</p>
-                        <p>Most legitimate business emails use .com domains.</p>
+                        <p style="margin-top: 8px;">Be careful, this could be a phishing attempt.</p>
+                        <p style="margin-top: 8px;">Most legitimate business emails use .com domains.</p>
                     </div>
                 `;
             } else if (w.type === 'impersonation') {
