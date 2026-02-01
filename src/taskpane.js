@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.6.0 - Updated: International sender detection, simplified brand warnings
+// Version 3.7.0 - Updated: Retailer brand detection, suspicious TLD expansion, header text update
 
 // ============================================
 // CONFIGURATION
@@ -52,7 +52,9 @@ const COUNTRY_CODE_TLDS = {
     '.cf': 'Central African Republic', '.gq': 'Equatorial Guinea',
     '.cm': 'Cameroon', '.cc': 'Cocos Islands', '.ws': 'Samoa',
     '.pw': 'Palau', '.top': 'Generic (often abused)', '.xyz': 'Generic (often abused)',
-    '.buzz': 'Generic (often abused)', '.icu': 'Generic (often abused)'
+    '.buzz': 'Generic (often abused)', '.icu': 'Generic (often abused)',
+    '.biz': 'Generic (often abused)', '.info': 'Generic (often abused)',
+    '.shop': 'Generic (often abused)', '.club': 'Generic (often abused)'
 };
 
 // TLDs to flag as international senders (subset that warrants warning)
@@ -215,6 +217,35 @@ const BRAND_CONTENT_DETECTION = {
     'zoom': {
         keywords: ['zoom meeting', 'zoom invitation', 'zoom account'],
         legitimateDomains: ['zoom.us', 'zoom.com']
+    },
+    // v3.7.0: Major Retailers
+    'walmart': {
+        keywords: ['walmart', 'wal-mart'],
+        legitimateDomains: ['walmart.com']
+    },
+    'target': {
+        keywords: ['target order', 'target account', 'target registry', 'target circle'],
+        legitimateDomains: ['target.com']
+    },
+    'costco': {
+        keywords: ['costco', 'costco wholesale'],
+        legitimateDomains: ['costco.com']
+    },
+    'best buy': {
+        keywords: ['best buy', 'bestbuy', 'geek squad'],
+        legitimateDomains: ['bestbuy.com']
+    },
+    'home depot': {
+        keywords: ['home depot'],
+        legitimateDomains: ['homedepot.com']
+    },
+    'lowes': {
+        keywords: ['lowe\'s', 'lowes'],
+        legitimateDomains: ['lowes.com']
+    },
+    'ebay': {
+        keywords: ['ebay'],
+        legitimateDomains: ['ebay.com']
     }
 };
 
@@ -329,7 +360,19 @@ const IMPERSONATION_TARGETS = {
     "first american": ["firstam.com"],
     "chicago title": ["chicagotitle.com", "fnf.com"],
     "stewart title": ["stewart.com"],
-    "old republic title": ["oldrepublictitle.com", "oldrepublic.com"]
+    "old republic title": ["oldrepublictitle.com", "oldrepublic.com"],
+
+    // v3.7.0: Major Retailers
+    "walmart": ["walmart.com"],
+    "walmart customer support": ["walmart.com"],
+    "target": ["target.com"],
+    "costco": ["costco.com"],
+    "costco wholesale": ["costco.com"],
+    "best buy": ["bestbuy.com"],
+    "geek squad": ["bestbuy.com", "geeksquad.com"],
+    "home depot": ["homedepot.com"],
+    "lowes": ["lowes.com"],
+    "ebay": ["ebay.com"]
 };
 
 // ============================================
@@ -456,14 +499,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v3.6.0 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v3.7.0 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.6.0 initializing for Outlook...');
+        console.log('Email Fraud Detector v3.7.0 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v3.6.0 ready');
+        console.log('Email Fraud Detector v3.7.0 ready');
     }
 });
 
@@ -782,7 +825,7 @@ function detectGibberishDomain(email) {
     }
     
     // Check 3: Suspicious TLD combined with other signals
-    const suspiciousTLDs = ['.us', '.tk', '.ml', '.ga', '.cf', '.gq', '.pw', '.cc', '.ws', '.top', '.xyz', '.buzz'];
+    const suspiciousTLDs = ['.us', '.tk', '.ml', '.ga', '.cf', '.gq', '.pw', '.cc', '.ws', '.top', '.xyz', '.buzz', '.biz', '.info', '.shop', '.club', '.icu'];
     const tld = '.' + domainParts[domainParts.length - 1];
     if (suspiciousTLDs.includes(tld) && suspicionScore > 0) {
         suspicionScore += 1;
@@ -925,6 +968,16 @@ function detectSuspiciousDomain(domain) {
                 reason: `This domain uses ${fakeTld} which mimics legitimate domain endings.`
             };
         }
+    }
+    
+    // v3.7.0: Check for suspicious generic TLDs (.biz, .info, .shop, etc.)
+    const suspiciousGenericTLDs = ['.biz', '.info', '.shop', '.club', '.top', '.xyz', '.buzz', '.icu'];
+    const tld = '.' + domainLower.split('.').pop();
+    if (suspiciousGenericTLDs.includes(tld)) {
+        return {
+            pattern: tld,
+            reason: `Domains ending in ${tld} are frequently associated with phishing, scams, and spam.`
+        };
     }
     
     // Get the registrable domain (the part someone can register, not subdomains)
@@ -1473,7 +1526,7 @@ function displayResults(warnings) {
         document.body.classList.add('status-critical');
         statusBadge.className = 'status-badge danger';
         statusIcon.textContent = '🚨';
-        statusText.textContent = `${totalWarnings} Warning${totalWarnings > 1 ? 's' : ''} Detected`;
+        statusText.textContent = `${totalWarnings} Issue${totalWarnings > 1 ? 's' : ''} Found`;
     } else {
         document.body.classList.add('status-safe');
         statusBadge.className = 'status-badge safe';
