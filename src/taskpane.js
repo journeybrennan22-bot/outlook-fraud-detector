@@ -43,7 +43,7 @@ const COUNTRY_CODE_TLDS = {
     '.ro': 'Romania', '.ru': 'Russia', '.sa': 'Saudi Arabia',
     '.se': 'Sweden', '.sg': 'Singapore', '.th': 'Thailand',
     '.tr': 'Turkey', '.tw': 'Taiwan', '.ua': 'Ukraine',
-    '.uk': 'United Kingdom', '.ve': 'Venezuela', '.vn': 'Vietnam',
+    '.uk': 'United Kingdom', '.us': 'United States', '.ve': 'Venezuela', '.vn': 'Vietnam',
     '.za': 'South Africa', '.ng': 'Nigeria', '.ke': 'Kenya',
     '.eg': 'Egypt', '.ae': 'United Arab Emirates',
     
