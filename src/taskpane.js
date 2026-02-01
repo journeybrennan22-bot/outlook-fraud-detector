@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.7.0 - Updated: Retailer brand detection, suspicious TLD expansion, header text update
+// Version 3.8.0 - Updated: On-behalf-of detection, deduplicated brand/org warnings
 
 // ============================================
 // CONFIGURATION
@@ -499,14 +499,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v3.7.0 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v3.8.0 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.7.0 initializing for Outlook...');
+        console.log('Email Fraud Detector v3.8.0 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v3.7.0 ready');
+        console.log('Email Fraud Detector v3.8.0 ready');
     }
 });
 
@@ -1214,6 +1214,7 @@ async function analyzeCurrentEmail() {
             if (item.getAllInternetHeadersAsync) {
                 item.getAllInternetHeadersAsync((headerResult) => {
                     let replyTo = null;
+                    let senderHeader = null;
                     if (headerResult.status === Office.AsyncResultStatus.Succeeded) {
                         const headers = headerResult.value;
                         const replyToMatch = headers.match(/^Reply-To:\s*(.+)$/mi);
@@ -1223,13 +1224,22 @@ async function analyzeCurrentEmail() {
                                 replyTo = emailMatch[1].trim();
                             }
                         }
+                        // v3.8.0: Parse Sender header for "on behalf of" detection
+                        const senderMatch = headers.match(/^Sender:\s*(.+)$/mi);
+                        if (senderMatch) {
+                            const senderEmailMatch = senderMatch[1].match(/<([^>]+)>/) || senderMatch[1].match(/([^\s,]+@[^\s,]+)/);
+                            if (senderEmailMatch) {
+                                senderHeader = senderEmailMatch[1].trim();
+                            }
+                        }
                     }
                     
                     const emailData = {
                         from: from,
                         subject: subject,
                         body: bodyResult.value || '',
-                        replyTo: replyTo
+                        replyTo: replyTo,
+                        senderHeader: senderHeader
                     };
                     
                     processEmail(emailData);
@@ -1239,7 +1249,8 @@ async function analyzeCurrentEmail() {
                     from: from,
                     subject: subject,
                     body: bodyResult.value || '',
-                    replyTo: null
+                    replyTo: null,
+                    senderHeader: null
                 };
                 
                 processEmail(emailData);
@@ -1258,6 +1269,7 @@ function processEmail(emailData) {
     const senderDomain = senderEmail.split('@')[1] || '';
     const content = (emailData.subject || '') + ' ' + (emailData.body || '');
     const replyTo = emailData.replyTo;
+    const senderHeader = emailData.senderHeader;
     
     const isKnownContact = knownContacts.has(senderEmail);
     
@@ -1308,7 +1320,7 @@ function processEmail(emailData) {
     }
 
     // ============================================
-    // EXISTING CHECKS (unchanged)
+    // EXISTING CHECKS
     // ============================================
     
     // 1. Reply-To Mismatch
@@ -1322,6 +1334,22 @@ function processEmail(emailData) {
                 description: 'Replies will go to a different address than the sender.',
                 senderEmail: senderEmail,
                 matchedEmail: replyTo
+            });
+        }
+    }
+    
+    // v3.8.0: On-Behalf-Of / Sender Mismatch
+    if (senderHeader) {
+        const senderHeaderLower = senderHeader.toLowerCase();
+        const senderHeaderDomain = senderHeaderLower.split('@')[1] || '';
+        if (senderHeaderDomain && senderHeaderDomain !== senderDomain) {
+            warnings.push({
+                type: 'on-behalf-of',
+                severity: 'medium',
+                title: 'Sent On Behalf Of Another Domain',
+                description: 'This email was sent by one domain on behalf of a completely different domain. This is a common tactic used to disguise the true origin of an email.',
+                senderEmail: senderHeader,
+                matchedEmail: senderEmail
             });
         }
     }
@@ -1342,18 +1370,24 @@ function processEmail(emailData) {
     }
     
     // 3. Organization Impersonation
+    // v3.8.0: Skip if brand impersonation already caught this brand (avoids duplicate warnings)
     if (!isTrustedDomain(senderDomain)) {
         const orgImpersonation = detectOrganizationImpersonation(displayName, senderDomain);
         if (orgImpersonation) {
-            warnings.push({
-                type: 'org-impersonation',
-                severity: 'critical',
-                title: 'Organization Impersonation',
-                description: orgImpersonation.message,
-                senderEmail: senderEmail,
-                entityClaimed: orgImpersonation.entityClaimed,
-                legitimateDomains: orgImpersonation.legitimateDomains
-            });
+            // Only add if brand impersonation didn't already flag the same entity
+            const brandAlreadyCaught = brandImpersonation && 
+                brandImpersonation.brandName.toLowerCase() === orgImpersonation.entityClaimed.toLowerCase();
+            if (!brandAlreadyCaught) {
+                warnings.push({
+                    type: 'org-impersonation',
+                    severity: 'critical',
+                    title: 'Organization Impersonation',
+                    description: orgImpersonation.message,
+                    senderEmail: senderEmail,
+                    entityClaimed: orgImpersonation.entityClaimed,
+                    legitimateDomains: orgImpersonation.legitimateDomains
+                });
+            }
         }
     }
     
@@ -1543,20 +1577,21 @@ function displayResults(warnings) {
         // Sort warnings by priority (highest threat first)
         const WARNING_PRIORITY = {
             'replyto-mismatch': 1,
-            'impersonation': 2,
-            'recipient-spoof': 3,
-            'contact-lookalike': 4,
-            'brand-impersonation': 5,
-            'org-impersonation': 6,
-            'suspicious-domain': 7,
-            'via-routing': 8,
-            'gibberish-domain': 9,
-            'lookalike-domain': 10,
-            'homoglyph': 11,
-            'display-name-suspicion': 12,
-            'international-sender': 13,
-            'wire-fraud': 14,
-            'phishing-urgency': 15
+            'on-behalf-of': 2,
+            'impersonation': 3,
+            'recipient-spoof': 4,
+            'contact-lookalike': 5,
+            'brand-impersonation': 6,
+            'org-impersonation': 7,
+            'suspicious-domain': 8,
+            'via-routing': 9,
+            'gibberish-domain': 10,
+            'lookalike-domain': 11,
+            'homoglyph': 12,
+            'display-name-suspicion': 13,
+            'international-sender': 14,
+            'wire-fraud': 15,
+            'phishing-urgency': 16
         };
         warnings.sort((a, b) => (WARNING_PRIORITY[a.type] || 99) - (WARNING_PRIORITY[b.type] || 99));
         
@@ -1651,7 +1686,7 @@ function displayResults(warnings) {
                     </div>
                 `;
             } else if (w.senderEmail && w.matchedEmail) {
-                const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : w.type === 'gibberish-domain' ? 'Domain' : 'Similar to';
+                const matchLabel = w.type === 'replyto-mismatch' ? 'Replies go to' : w.type === 'on-behalf-of' ? 'On behalf of' : w.type === 'gibberish-domain' ? 'Domain' : 'Similar to';
                 emailHtml = `
                     <div class="warning-emails">
                         <div class="warning-email-row">
