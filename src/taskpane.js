@@ -1005,7 +1005,7 @@ function detectSuspiciousDomain(domain) {
         if (domainLower.endsWith(fakeTld)) {
             return {
                 pattern: fakeTld,
-                reason: `This domain uses ${fakeTld} which mimics legitimate domain endings.`
+                reason: `This email was sent from a domain ending in ${fakeTld}. This domain extension is designed to look like a legitimate country domain but is not. Proceed with caution.`
             };
         }
     }
@@ -1016,7 +1016,7 @@ function detectSuspiciousDomain(domain) {
     if (suspiciousGenericTLDs.includes(tld)) {
         return {
             pattern: tld,
-            reason: `Domains ending in ${tld} are frequently associated with phishing, scams, and spam.`
+            reason: `This email was sent from a domain ending in ${tld}. Domains ending in ${tld} have been identified by Spamhaus and Symantec as frequently used in spam and phishing campaigns. Proceed with caution.`
         };
     }
     
@@ -1453,9 +1453,7 @@ function processEmail(emailData) {
             type: 'suspicious-domain',
             severity: 'medium',
             title: 'Suspicious Domain',
-            description: suspiciousDomain.reason,
-            senderEmail: senderEmail,
-            matchedEmail: suspiciousDomain.pattern
+            description: suspiciousDomain.reason
         });
     }
     
