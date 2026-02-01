@@ -246,6 +246,19 @@ const BRAND_CONTENT_DETECTION = {
     'ebay': {
         keywords: ['ebay'],
         legitimateDomains: ['ebay.com']
+    },
+    // v3.8.0: Government Agencies
+    'dmv': {
+        keywords: ['department of motor vehicles', 'dmv service desk', 'dmv appointment', 'dmv registration'],
+        legitimateDomains: ['.gov']
+    },
+    'irs': {
+        keywords: ['internal revenue service', 'irs refund', 'irs audit', 'tax return', 'irs notice'],
+        legitimateDomains: ['irs.gov']
+    },
+    'social security': {
+        keywords: ['social security administration', 'social security number', 'ssa benefit', 'social security statement'],
+        legitimateDomains: ['ssa.gov']
     }
 };
 
@@ -372,7 +385,23 @@ const IMPERSONATION_TARGETS = {
     "geek squad": ["bestbuy.com", "geeksquad.com"],
     "home depot": ["homedepot.com"],
     "lowes": ["lowes.com"],
-    "ebay": ["ebay.com"]
+    "ebay": ["ebay.com"],
+
+    // v3.8.0: State Government Agencies
+    "dmv": [".gov"],
+    "dmv service desk": [".gov"],
+    "department of motor vehicles": [".gov"],
+    "motor vehicles": [".gov"],
+    "state tax board": [".gov"],
+    "franchise tax board": [".gov"],
+    "edd": [".gov"],
+    "employment development": [".gov"],
+    "unemployment insurance": [".gov"],
+    "child support services": [".gov"],
+    "department of revenue": [".gov"],
+    "state attorney general": [".gov"],
+    "attorney general": [".gov"]
+
 };
 
 // ============================================
@@ -875,9 +904,13 @@ function detectBrandImpersonation(subject, body, senderDomain) {
             }
             
             const domainLower = senderDomain.toLowerCase();
-            const isLegitimate = config.legitimateDomains.some(legit => 
-                domainLower === legit || domainLower.endsWith(`.${legit}`)
-            );
+            const isLegitimate = config.legitimateDomains.some(legit => {
+                // v3.8.0: Handle suffix patterns like ".gov" for government agencies
+                if (legit.startsWith('.')) {
+                    return domainLower.endsWith(legit);
+                }
+                return domainLower === legit || domainLower.endsWith(`.${legit}`);
+            });
             
             if (!isLegitimate) {
                 return {
@@ -906,15 +939,22 @@ function detectOrganizationImpersonation(displayName, senderDomain) {
         
         if (entityPattern.test(searchText)) {
             const isLegitimate = legitimateDomains.some(legit => {
+                // v3.8.0: Handle suffix patterns like ".gov" for government agencies
+                if (legit.startsWith('.')) {
+                    return senderDomain.endsWith(legit);
+                }
                 return senderDomain === legit || senderDomain.endsWith(`.${legit}`);
             });
             
             if (!isLegitimate) {
+                // v3.8.0: Better messaging for government agencies
+                const hasGovSuffix = legitimateDomains.some(d => d === '.gov');
+                const displayDomains = hasGovSuffix ? 'official .gov domains' : legitimateDomains.join(', ');
                 return {
                     entityClaimed: formatEntityName(entityName),
                     senderDomain: senderDomain,
                     legitimateDomains: legitimateDomains,
-                    message: `Sender claims to be "${formatEntityName(entityName)}" but email comes from ${senderDomain}. Legitimate emails come from: ${legitimateDomains.join(', ')}`
+                    message: `Sender claims to be "${formatEntityName(entityName)}" but email comes from ${senderDomain}. Legitimate emails come from: ${displayDomains}`
                 };
             }
         }
