@@ -1582,14 +1582,6 @@ function formatDomainsList(domains) {
 }
 
 function displayResults(warnings) {
-    // v3.8.0: Inject truncation styles for long email addresses (once)
-    if (!document.getElementById('efa-truncation-styles')) {
-        const style = document.createElement('style');
-        style.id = 'efa-truncation-styles';
-        style.textContent = `.warning-email-value { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 100%; }`;
-        document.head.appendChild(style);
-    }
-
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('error').classList.add('hidden');
     document.getElementById('results').classList.remove('hidden');
