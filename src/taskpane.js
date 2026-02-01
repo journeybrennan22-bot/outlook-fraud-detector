@@ -76,7 +76,7 @@ const INTERNATIONAL_TLDS = [
 ];
 
 // Fake country-lookalike TLDs (commercial services mimicking real TLDs)
-const FAKE_COUNTRY_TLDS = ['.us.com', '.co.uk.com', '.eu.com', '.de.com', '.br.com'];
+const FAKE_COUNTRY_TLDS = ['.us.com', '.uk.com', '.co.uk.com', '.eu.com', '.de.com', '.br.com', '.au.com', '.cn.com', '.jp.com', '.kr.com', '.ru.com', '.sa.com', '.za.com'];
 
 // Suspicious words commonly used in fake domains
 const SUSPICIOUS_DOMAIN_WORDS = [
@@ -1317,7 +1317,7 @@ function detectGibberishDomain(email) {
     const reasons = [];
     
     // Check 1: High digit ratio in main domain part
-    if (mainPart.length > 5) {
+    if (mainPart.length > 3) {
         const digitCount = (mainPart.match(/\d/g) || []).length;
         const digitRatio = digitCount / mainPart.length;
         if (digitRatio > 0.3) {
@@ -1335,9 +1335,11 @@ function detectGibberishDomain(email) {
             const hasDigits = /\d/.test(sub);
             const hasLetters = /[a-z]/i.test(sub);
             const isShortAndRandom = sub.length > 4 && hasDigits && hasLetters;
+            const vowelCount = (sub.match(/[aeiou]/gi) || []).length;
+            const isConsonantSoup = sub.length > 3 && hasLetters && vowelCount === 0;
             const containsNoWords = !/(mail|web|app|api|www|cdn|img|static|secure|login|account|cloud|storage)/i.test(sub);
             
-            if (isShortAndRandom && containsNoWords) {
+            if ((isShortAndRandom || isConsonantSoup) && containsNoWords) {
                 gibberishSubdomains++;
             }
         }
@@ -1356,11 +1358,11 @@ function detectGibberishDomain(email) {
         reasons.push('suspicious TLD (' + tld + ')');
     }
     
-    // Check 4: No vowels in main domain part
-    if (mainPart.length > 6) {
+    // Check 4: No vowels in main domain part (strong gibberish signal)
+    if (mainPart.length > 3) {
         const vowelCount = (mainPart.match(/[aeiou]/gi) || []).length;
         if (vowelCount === 0) {
-            suspicionScore += 2;
+            suspicionScore += 3;
             reasons.push('no vowels in domain');
         }
     }
