@@ -59,10 +59,20 @@ const COUNTRY_CODE_TLDS = {
 
 // TLDs to flag as international senders (subset that warrants warning)
 const INTERNATIONAL_TLDS = [
+    // Compound country TLDs
     '.com.co', '.com.br', '.com.mx', '.com.ar', '.com.au', '.com.ng',
     '.com.pk', '.com.ph', '.com.ua', '.com.ve', '.com.vn', '.com.tr',
-    '.net.co', '.net.br', '.org.co', '.us',
-    '.cm', '.cc', '.ru', '.cn', '.tk', '.ml', '.ga', '.cf', '.gq', '.pw'
+    '.net.co', '.net.br', '.org.co',
+    // Commonly abused TLDs
+    '.cm', '.cc', '.tk', '.ml', '.ga', '.cf', '.gq', '.pw',
+    // ALL country code TLDs trigger international sender warning
+    '.ae', '.ar', '.at', '.au', '.be', '.br', '.ca', '.ch', '.cl', '.cn',
+    '.co', '.cz', '.de', '.dk', '.eg', '.es', '.fi', '.fr', '.gr',
+    '.hk', '.hu', '.id', '.ie', '.il', '.in', '.it', '.jp',
+    '.ke', '.kr', '.mx', '.my', '.ng', '.nl', '.no', '.nz',
+    '.pe', '.ph', '.pk', '.pl', '.pt', '.ro', '.ru',
+    '.sa', '.se', '.sg', '.th', '.tr', '.tw', '.ua', '.uk', '.us',
+    '.ve', '.vn', '.za'
 ];
 
 // Fake country-lookalike TLDs (commercial services mimicking real TLDs)
@@ -1735,6 +1745,11 @@ async function analyzeCurrentEmail() {
         const from = item.from;
         const subject = item.subject;
         
+        // v3.8.1: Count recipients for mass-distribution detection
+        const toRecipients = Array.isArray(item.to) ? item.to : [];
+        const ccRecipients = Array.isArray(item.cc) ? item.cc : [];
+        const recipientCount = toRecipients.length + ccRecipients.length;
+        
         item.body.getAsync(Office.CoercionType.Text, (bodyResult) => {
             if (item.getAllInternetHeadersAsync) {
                 item.getAllInternetHeadersAsync((headerResult) => {
@@ -1764,7 +1779,8 @@ async function analyzeCurrentEmail() {
                         subject: subject,
                         body: bodyResult.value || '',
                         replyTo: replyTo,
-                        senderHeader: senderHeader
+                        senderHeader: senderHeader,
+                        recipientCount: recipientCount
                     };
                     
                     processEmail(emailData);
@@ -1775,7 +1791,8 @@ async function analyzeCurrentEmail() {
                     subject: subject,
                     body: bodyResult.value || '',
                     replyTo: null,
-                    senderHeader: null
+                    senderHeader: null,
+                    recipientCount: recipientCount
                 };
                 
                 processEmail(emailData);
@@ -2029,6 +2046,16 @@ function processEmail(emailData) {
         }
     }
     
+    // 12. Mass Recipients (v3.8.1)
+    if (emailData.recipientCount >= 10) {
+        warnings.push({
+            type: 'mass-recipients',
+            severity: 'medium',
+            title: 'Mass-Distributed Email',
+            description: `This email was sent to ${emailData.recipientCount}+ recipients. Legitimate invoices, payment confirmations, and account alerts are sent to individuals — not large groups.`
+        });
+    }
+    
     displayResults(warnings);
 }
 
@@ -2113,8 +2140,9 @@ function displayResults(warnings) {
             'homoglyph': 12,
             'display-name-suspicion': 13,
             'international-sender': 14,
-            'wire-fraud': 15,
-            'phishing-urgency': 16
+            'mass-recipients': 15,
+            'wire-fraud': 16,
+            'phishing-urgency': 17
         };
         warnings.sort((a, b) => (WARNING_PRIORITY[a.type] || 99) - (WARNING_PRIORITY[b.type] || 99));
         
@@ -2180,6 +2208,13 @@ function displayResults(warnings) {
                         <p>This sender's email address includes a country code: ${w.tld}<br>(${w.country})</p>
                         <p style="margin-top: 8px;">Be careful, this could be a phishing attempt.</p>
                         <p style="margin-top: 8px;">Most legitimate business emails use .com domains.</p>
+                    </div>
+                `;
+            } else if (w.type === 'mass-recipients') {
+                // v3.8.1: Mass-distributed email warning
+                emailHtml = `
+                    <div class="warning-international-info">
+                        <p style="margin-top: 8px;">Be suspicious of any email requesting action or payment that was sent to a large group.</p>
                     </div>
                 `;
             } else if (w.type === 'impersonation') {
