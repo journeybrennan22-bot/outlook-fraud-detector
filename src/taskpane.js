@@ -259,6 +259,302 @@ const BRAND_CONTENT_DETECTION = {
     'social security': {
         keywords: ['social security administration', 'social security number', 'ssa benefit', 'social security statement'],
         legitimateDomains: ['ssa.gov']
+    },
+
+    // v3.8.1: Telecom
+    'att': {
+        keywords: ['at&t', 'att account', 'att wireless'],
+        legitimateDomains: ['att.com', 'att.net']
+    },
+    'verizon': {
+        keywords: ['verizon', 'verizon wireless', 'verizon fios'],
+        legitimateDomains: ['verizon.com', 'verizonwireless.com']
+    },
+    'tmobile': {
+        keywords: ['t-mobile', 'tmobile'],
+        legitimateDomains: ['t-mobile.com']
+    },
+    'xfinity': {
+        keywords: ['xfinity', 'comcast'],
+        legitimateDomains: ['xfinity.com', 'comcast.com', 'comcast.net']
+    },
+    'spectrum': {
+        keywords: ['spectrum internet', 'spectrum account', 'spectrum mobile'],
+        legitimateDomains: ['spectrum.com', 'spectrum.net', 'charter.com']
+    },
+
+    // v3.8.1: Social Media
+    'whatsapp': {
+        keywords: ['whatsapp'],
+        legitimateDomains: ['whatsapp.com']
+    },
+    'instagram': {
+        keywords: ['instagram account', 'instagram security'],
+        legitimateDomains: ['instagram.com', 'mail.instagram.com']
+    },
+    'tiktok': {
+        keywords: ['tiktok account', 'tiktok security'],
+        legitimateDomains: ['tiktok.com']
+    },
+    'twitter': {
+        keywords: ['twitter account', 'x account'],
+        legitimateDomains: ['twitter.com', 'x.com']
+    },
+    'snapchat': {
+        keywords: ['snapchat account', 'snapchat security'],
+        legitimateDomains: ['snapchat.com']
+    },
+
+    // v3.8.1: Gaming
+    'steam': {
+        keywords: ['steam account', 'steam guard', 'steam wallet'],
+        legitimateDomains: ['steampowered.com', 'store.steampowered.com', 'steamcommunity.com']
+    },
+    'roblox': {
+        keywords: ['roblox account', 'roblox security', 'robux'],
+        legitimateDomains: ['roblox.com']
+    },
+    'playstation': {
+        keywords: ['playstation account', 'psn account', 'playstation network'],
+        legitimateDomains: ['playstation.com', 'sony.com', 'sonyentertainmentnetwork.com']
+    },
+    'xbox': {
+        keywords: ['xbox account', 'xbox live', 'xbox game pass'],
+        legitimateDomains: ['xbox.com', 'microsoft.com']
+    },
+    'epic games': {
+        keywords: ['epic games', 'fortnite account', 'epic account'],
+        legitimateDomains: ['epicgames.com', 'unrealengine.com']
+    },
+
+    // v3.8.1: Streaming
+    'spotify': {
+        keywords: ['spotify', 'spotify premium', 'spotify account'],
+        legitimateDomains: ['spotify.com']
+    },
+    'disney plus': {
+        keywords: ['disney+', 'disney plus', 'disneyplus'],
+        legitimateDomains: ['disneyplus.com', 'disney.com', 'go.com']
+    },
+    'hulu': {
+        keywords: ['hulu account', 'hulu subscription'],
+        legitimateDomains: ['hulu.com']
+    },
+    'max': {
+        keywords: ['hbo max', 'max account', 'max subscription'],
+        legitimateDomains: ['max.com', 'hbomax.com']
+    },
+    'roku': {
+        keywords: ['roku account', 'roku device'],
+        legitimateDomains: ['roku.com']
+    },
+    'youtube': {
+        keywords: ['youtube account', 'youtube premium', 'youtube tv'],
+        legitimateDomains: ['youtube.com', 'google.com']
+    },
+    'paramount': {
+        keywords: ['paramount+', 'paramount plus'],
+        legitimateDomains: ['paramountplus.com', 'paramount.com']
+    },
+
+    // v3.8.1: Financial Services & Credit Cards
+    'visa': {
+        keywords: ['visa card', 'visa account', 'visa security'],
+        legitimateDomains: ['visa.com']
+    },
+    'mastercard': {
+        keywords: ['mastercard', 'master card'],
+        legitimateDomains: ['mastercard.com']
+    },
+    'stripe': {
+        keywords: ['stripe payment', 'stripe account'],
+        legitimateDomains: ['stripe.com']
+    },
+    'robinhood': {
+        keywords: ['robinhood account', 'robinhood security'],
+        legitimateDomains: ['robinhood.com']
+    },
+    'fidelity': {
+        keywords: ['fidelity investments', 'fidelity account', 'fidelity 401k'],
+        legitimateDomains: ['fidelity.com', 'fidelityinvestments.com']
+    },
+    'schwab': {
+        keywords: ['charles schwab', 'schwab account'],
+        legitimateDomains: ['schwab.com']
+    },
+    'vanguard': {
+        keywords: ['vanguard account', 'vanguard investments'],
+        legitimateDomains: ['vanguard.com']
+    },
+    'morgan stanley': {
+        keywords: ['morgan stanley'],
+        legitimateDomains: ['morganstanley.com']
+    },
+    'wise': {
+        keywords: ['wise transfer', 'transferwise'],
+        legitimateDomains: ['wise.com']
+    },
+    'affirm': {
+        keywords: ['affirm payment', 'affirm account'],
+        legitimateDomains: ['affirm.com']
+    },
+    'klarna': {
+        keywords: ['klarna payment', 'klarna account'],
+        legitimateDomains: ['klarna.com']
+    },
+
+    // v3.8.1: Insurance - Auto/Home
+    'state farm': {
+        keywords: ['state farm'],
+        legitimateDomains: ['statefarm.com']
+    },
+    'geico': {
+        keywords: ['geico'],
+        legitimateDomains: ['geico.com']
+    },
+    'progressive': {
+        keywords: ['progressive insurance', 'progressive auto'],
+        legitimateDomains: ['progressive.com']
+    },
+    'allstate': {
+        keywords: ['allstate'],
+        legitimateDomains: ['allstate.com']
+    },
+    'liberty mutual': {
+        keywords: ['liberty mutual'],
+        legitimateDomains: ['libertymutual.com']
+    },
+    'farmers insurance': {
+        keywords: ['farmers insurance'],
+        legitimateDomains: ['farmers.com']
+    },
+    'nationwide': {
+        keywords: ['nationwide insurance', 'nationwide account'],
+        legitimateDomains: ['nationwide.com']
+    },
+    'travelers': {
+        keywords: ['travelers insurance'],
+        legitimateDomains: ['travelers.com']
+    },
+    'the hartford': {
+        keywords: ['the hartford'],
+        legitimateDomains: ['thehartford.com']
+    },
+    'american family': {
+        keywords: ['american family insurance', 'amfam'],
+        legitimateDomains: ['amfam.com']
+    },
+    'erie insurance': {
+        keywords: ['erie insurance'],
+        legitimateDomains: ['erieinsurance.com']
+    },
+
+    // v3.8.1: Insurance - Health
+    'unitedhealthcare': {
+        keywords: ['unitedhealthcare', 'united healthcare', 'uhc'],
+        legitimateDomains: ['uhc.com', 'unitedhealthcare.com', 'myuhc.com', 'optum.com']
+    },
+    'blue cross': {
+        keywords: ['blue cross', 'blue shield', 'bcbs', 'bluecross'],
+        legitimateDomains: ['bcbs.com', 'anthem.com', 'bluecrossma.com']
+    },
+    'cigna': {
+        keywords: ['cigna'],
+        legitimateDomains: ['cigna.com', 'mycigna.com']
+    },
+    'humana': {
+        keywords: ['humana'],
+        legitimateDomains: ['humana.com']
+    },
+    'kaiser': {
+        keywords: ['kaiser permanente'],
+        legitimateDomains: ['kaiserpermanente.org', 'kp.org']
+    },
+    'aetna': {
+        keywords: ['aetna'],
+        legitimateDomains: ['aetna.com']
+    },
+
+    // v3.8.1: Insurance - Life & General
+    'metlife': {
+        keywords: ['metlife'],
+        legitimateDomains: ['metlife.com']
+    },
+    'prudential': {
+        keywords: ['prudential financial', 'prudential insurance'],
+        legitimateDomains: ['prudential.com']
+    },
+    'new york life': {
+        keywords: ['new york life'],
+        legitimateDomains: ['newyorklife.com']
+    },
+    'northwestern mutual': {
+        keywords: ['northwestern mutual'],
+        legitimateDomains: ['northwesternmutual.com']
+    },
+    'aflac': {
+        keywords: ['aflac'],
+        legitimateDomains: ['aflac.com']
+    },
+
+    // v3.8.1: Auto/Membership
+    'aaa': {
+        keywords: ['aaa membership', 'aaa roadside', 'aaa insurance'],
+        legitimateDomains: ['aaa.com', 'ace.aaa.com', 'calif.aaa.com']
+    },
+
+    // v3.8.1: Travel
+    'booking.com': {
+        keywords: ['booking.com', 'booking confirmation'],
+        legitimateDomains: ['booking.com']
+    },
+    'airbnb': {
+        keywords: ['airbnb'],
+        legitimateDomains: ['airbnb.com']
+    },
+    'expedia': {
+        keywords: ['expedia'],
+        legitimateDomains: ['expedia.com']
+    },
+    'southwest airlines': {
+        keywords: ['southwest airlines', 'southwest rapid rewards'],
+        legitimateDomains: ['southwest.com', 'southwestairlines.com']
+    },
+    'united airlines': {
+        keywords: ['united airlines', 'united mileageplus'],
+        legitimateDomains: ['united.com']
+    },
+    'delta airlines': {
+        keywords: ['delta air lines', 'delta skymiles'],
+        legitimateDomains: ['delta.com']
+    },
+    'american airlines': {
+        keywords: ['american airlines', 'aadvantage'],
+        legitimateDomains: ['aa.com', 'americanairlines.com']
+    },
+
+    // v3.8.1: Security Software
+    'norton': {
+        keywords: ['norton', 'nortonlifelock', 'norton 360'],
+        legitimateDomains: ['norton.com', 'nortonlifelock.com', 'gen.digital']
+    },
+    'avast': {
+        keywords: ['avast'],
+        legitimateDomains: ['avast.com']
+    },
+
+    // v3.8.1: Crypto
+    'binance': {
+        keywords: ['binance'],
+        legitimateDomains: ['binance.com']
+    },
+    'kraken': {
+        keywords: ['kraken exchange', 'kraken account'],
+        legitimateDomains: ['kraken.com']
+    },
+    'crypto.com': {
+        keywords: ['crypto.com'],
+        legitimateDomains: ['crypto.com']
     }
 };
 
@@ -400,7 +696,196 @@ const IMPERSONATION_TARGETS = {
     "child support services": [".gov"],
     "department of revenue": [".gov"],
     "state attorney general": [".gov"],
-    "attorney general": [".gov"]
+    "attorney general": [".gov"],
+
+    // v3.8.1: Telecom
+    "at&t": ["att.com", "att.net"],
+    "att": ["att.com", "att.net"],
+    "att wireless": ["att.com"],
+    "verizon": ["verizon.com", "verizonwireless.com"],
+    "verizon wireless": ["verizon.com", "verizonwireless.com"],
+    "t-mobile": ["t-mobile.com"],
+    "tmobile": ["t-mobile.com"],
+    "sprint": ["sprint.com", "t-mobile.com"],
+    "xfinity": ["xfinity.com", "comcast.com"],
+    "comcast": ["xfinity.com", "comcast.com", "comcast.net"],
+    "spectrum": ["spectrum.com", "spectrum.net", "charter.com"],
+    "cox communications": ["cox.com"],
+    "cricket wireless": ["cricketwireless.com"],
+    "metro by t-mobile": ["t-mobile.com", "metrobyt-mobile.com"],
+    "boost mobile": ["boostmobile.com"],
+
+    // v3.8.1: Social Media
+    "whatsapp": ["whatsapp.com"],
+    "whatsapp support": ["whatsapp.com"],
+    "instagram": ["instagram.com", "mail.instagram.com"],
+    "instagram support": ["instagram.com"],
+    "tiktok": ["tiktok.com"],
+    "tiktok support": ["tiktok.com"],
+    "twitter": ["twitter.com", "x.com"],
+    "twitter support": ["twitter.com", "x.com"],
+    "snapchat": ["snapchat.com"],
+    "snapchat support": ["snapchat.com"],
+    "pinterest": ["pinterest.com"],
+    "reddit": ["reddit.com", "redditmail.com"],
+    "threads": ["threads.net", "instagram.com"],
+
+    // v3.8.1: Gaming
+    "steam": ["steampowered.com", "store.steampowered.com", "steamcommunity.com"],
+    "steam support": ["steampowered.com"],
+    "valve": ["valvesoftware.com", "steampowered.com"],
+    "roblox": ["roblox.com"],
+    "roblox support": ["roblox.com"],
+    "playstation": ["playstation.com", "sony.com"],
+    "playstation network": ["playstation.com", "sony.com"],
+    "psn": ["playstation.com", "sony.com"],
+    "xbox": ["xbox.com", "microsoft.com"],
+    "xbox live": ["xbox.com", "microsoft.com"],
+    "epic games": ["epicgames.com"],
+    "fortnite": ["epicgames.com"],
+    "nintendo": ["nintendo.com"],
+    "nintendo account": ["nintendo.com"],
+    "ea games": ["ea.com"],
+    "electronic arts": ["ea.com"],
+    "riot games": ["riotgames.com"],
+    "blizzard": ["blizzard.com", "battle.net"],
+    "battle.net": ["blizzard.com", "battle.net"],
+
+    // v3.8.1: Streaming
+    "spotify": ["spotify.com"],
+    "spotify support": ["spotify.com"],
+    "disney+": ["disneyplus.com", "disney.com"],
+    "disney plus": ["disneyplus.com", "disney.com"],
+    "hulu": ["hulu.com"],
+    "hulu support": ["hulu.com"],
+    "hbo max": ["max.com", "hbomax.com"],
+    "max": ["max.com"],
+    "roku": ["roku.com"],
+    "youtube": ["youtube.com", "google.com"],
+    "youtube tv": ["youtube.com", "google.com"],
+    "paramount+": ["paramountplus.com", "paramount.com"],
+    "paramount plus": ["paramountplus.com", "paramount.com"],
+    "peacock": ["peacocktv.com", "nbcuni.com"],
+    "apple tv": ["apple.com"],
+
+    // v3.8.1: Financial Services & Credit Cards
+    "visa": ["visa.com"],
+    "visa card": ["visa.com"],
+    "mastercard": ["mastercard.com"],
+    "master card": ["mastercard.com"],
+    "stripe": ["stripe.com"],
+    "robinhood": ["robinhood.com"],
+    "fidelity": ["fidelity.com", "fidelityinvestments.com"],
+    "fidelity investments": ["fidelity.com"],
+    "charles schwab": ["schwab.com"],
+    "schwab": ["schwab.com"],
+    "vanguard": ["vanguard.com"],
+    "e-trade": ["etrade.com"],
+    "etrade": ["etrade.com"],
+    "td ameritrade": ["tdameritrade.com", "schwab.com"],
+    "morgan stanley": ["morganstanley.com"],
+    "merrill lynch": ["ml.com", "merrilledge.com"],
+    "goldman sachs": ["goldmansachs.com", "gs.com"],
+    "wise": ["wise.com"],
+    "transferwise": ["wise.com"],
+    "affirm": ["affirm.com"],
+    "klarna": ["klarna.com"],
+
+    // v3.8.1: Insurance - Auto/Home
+    "state farm": ["statefarm.com"],
+    "state farm insurance": ["statefarm.com"],
+    "geico": ["geico.com"],
+    "progressive": ["progressive.com"],
+    "progressive insurance": ["progressive.com"],
+    "allstate": ["allstate.com"],
+    "allstate insurance": ["allstate.com"],
+    "liberty mutual": ["libertymutual.com"],
+    "farmers insurance": ["farmers.com"],
+    "farmers": ["farmers.com"],
+    "nationwide": ["nationwide.com"],
+    "nationwide insurance": ["nationwide.com"],
+    "travelers": ["travelers.com"],
+    "travelers insurance": ["travelers.com"],
+    "the hartford": ["thehartford.com"],
+    "hartford insurance": ["thehartford.com"],
+    "american family insurance": ["amfam.com"],
+    "amfam": ["amfam.com"],
+    "erie insurance": ["erieinsurance.com"],
+    "shelter insurance": ["shelterinsurance.com"],
+    "auto-owners insurance": ["auto-owners.com"],
+
+    // v3.8.1: Insurance - Health
+    "unitedhealthcare": ["uhc.com", "unitedhealthcare.com", "myuhc.com", "optum.com"],
+    "united healthcare": ["uhc.com", "unitedhealthcare.com", "myuhc.com"],
+    "uhc": ["uhc.com", "unitedhealthcare.com"],
+    "blue cross": ["bcbs.com", "anthem.com"],
+    "blue shield": ["bcbs.com", "anthem.com"],
+    "blue cross blue shield": ["bcbs.com"],
+    "bcbs": ["bcbs.com"],
+    "anthem": ["anthem.com", "elevancehealth.com"],
+    "cigna": ["cigna.com", "mycigna.com"],
+    "humana": ["humana.com"],
+    "kaiser permanente": ["kaiserpermanente.org", "kp.org"],
+    "kaiser": ["kaiserpermanente.org", "kp.org"],
+    "aetna": ["aetna.com"],
+    "molina healthcare": ["molinahealthcare.com"],
+    "centene": ["centene.com"],
+
+    // v3.8.1: Insurance - Life & General
+    "metlife": ["metlife.com"],
+    "prudential": ["prudential.com"],
+    "prudential financial": ["prudential.com"],
+    "new york life": ["newyorklife.com"],
+    "northwestern mutual": ["northwesternmutual.com"],
+    "aflac": ["aflac.com"],
+    "lincoln financial": ["lincolnfinancial.com", "lfg.com"],
+    "principal financial": ["principal.com"],
+    "guardian life": ["guardianlife.com"],
+    "mass mutual": ["massmutual.com"],
+    "massmutual": ["massmutual.com"],
+    "transamerica": ["transamerica.com"],
+    "mutual of omaha": ["mutualofomaha.com"],
+
+    // v3.8.1: Auto/Membership
+    "aaa": ["aaa.com"],
+    "aaa roadside": ["aaa.com"],
+    "aaa insurance": ["aaa.com"],
+
+    // v3.8.1: Travel & Airlines
+    "booking.com": ["booking.com"],
+    "airbnb": ["airbnb.com"],
+    "airbnb support": ["airbnb.com"],
+    "expedia": ["expedia.com"],
+    "vrbo": ["vrbo.com"],
+    "hotels.com": ["hotels.com"],
+    "tripadvisor": ["tripadvisor.com"],
+    "southwest airlines": ["southwest.com"],
+    "southwest": ["southwest.com"],
+    "united airlines": ["united.com"],
+    "delta air lines": ["delta.com"],
+    "delta airlines": ["delta.com"],
+    "american airlines": ["aa.com", "americanairlines.com"],
+    "jetblue": ["jetblue.com"],
+    "alaska airlines": ["alaskaair.com"],
+    "frontier airlines": ["flyfrontier.com"],
+    "spirit airlines": ["spirit.com"],
+
+    // v3.8.1: Security Software
+    "norton": ["norton.com", "nortonlifelock.com", "gen.digital"],
+    "nortonlifelock": ["norton.com", "nortonlifelock.com"],
+    "norton 360": ["norton.com"],
+    "avast": ["avast.com"],
+    "avg": ["avg.com"],
+    "kaspersky": ["kaspersky.com"],
+    "bitdefender": ["bitdefender.com"],
+    "malwarebytes": ["malwarebytes.com"],
+
+    // v3.8.1: Crypto
+    "binance": ["binance.com"],
+    "kraken": ["kraken.com"],
+    "crypto.com": ["crypto.com"],
+    "gemini": ["gemini.com"],
+    "opensea": ["opensea.io"]
 
 };
 
