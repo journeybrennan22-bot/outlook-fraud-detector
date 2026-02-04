@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.9.0 - Updated: URL scanning for malicious links, enhanced fraud protection
+// Version 3.8.0 - Updated: On-behalf-of detection, deduplicated brand/org warnings
 
 // ============================================
 // CONFIGURATION
@@ -10,31 +10,6 @@ const CONFIG = {
     scopes: ['User.Read', 'Contacts.Read'],
     trustedDomains: []
 };
-
-// ============================================
-// URL SCANNER CONFIGURATION
-// ============================================
-const URL_SCANNER_CONFIG = {
-    maxUrlsPerEmail: 8,           // Performance limit
-    scanTimeout: 2500,            // 2.5 second timeout
-    enableUrlShortenerDetection: true,
-    enableSuspiciousTldDetection: true,
-    enableBrandLookalikeDetection: true
-};
-
-// URL shortener domains to flag
-const URL_SHORTENERS = [
-    'bit.ly', 'tinyurl.com', 'short.link', 't.co', 'goo.gl', 
-    'ow.ly', 'buff.ly', 'rebrand.ly', 'tiny.cc', 'is.gd',
-    'youtu.be', 'amzn.to', 'fb.me', 'lnkd.in'
-];
-
-// Suspicious TLDs commonly used in fraud
-const SUSPICIOUS_TLDS = [
-    '.tk', '.ml', '.ga', '.cf', '.gq', '.pw', '.cc', '.ws',
-    '.top', '.xyz', '.buzz', '.icu', '.click', '.download',
-    '.loan', '.racing', '.science', '.work', '.party'
-];
 
 // ============================================
 // COUNTRY CODE TLD LOOKUP
@@ -1043,20 +1018,19 @@ let currentItemId = null;
 let isAutoScanEnabled = true;
 let authInProgress = false;
 let contactsFetched = false;
-let urlScanCache = new Map();
 
 // ============================================
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v3.9.0 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v3.8.0 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.9.0 initializing for Outlook...');
+        console.log('Email Fraud Detector v3.8.0 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v3.9.0 ready');
+        console.log('Email Fraud Detector v3.8.0 ready');
     }
 });
 
@@ -1259,242 +1233,6 @@ function levenshteinDistance(a, b) {
         }
     }
     return matrix[b.length][a.length];
-}
-
-// ============================================
-// NEW v3.9.0: URL SCANNING FUNCTIONS
-// ============================================
-
-/**
- * Extract URLs from email text and HTML - optimized for speed
- */
-function extractUrlsFromEmail(emailText, emailHtml) {
-    const urls = new Set();
-    const urlPattern = /https?:\/\/[^\s<>"'(){}|\[\]`]+[^\s<>"'(){}|\[\]`.,]/gi;
-    
-    // Extract from plain text
-    if (emailText) {
-        const textUrls = emailText.match(urlPattern) || [];
-        textUrls.forEach(url => urls.add(url.toLowerCase()));
-    }
-    
-    // Extract from HTML (href attributes)
-    if (emailHtml) {
-        const hrefPattern = /href=['"]([^'"]*)['"]/gi;
-        let match;
-        while ((match = hrefPattern.exec(emailHtml)) !== null) {
-            const url = match[1];
-            if (url.startsWith('http://') || url.startsWith('https://')) {
-                urls.add(url.toLowerCase());
-            }
-        }
-    }
-    
-    // Limit URLs for performance
-    const urlArray = Array.from(urls);
-    return urlArray.slice(0, URL_SCANNER_CONFIG.maxUrlsPerEmail);
-}
-
-/**
- * Extract domain from URL
- */
-function extractDomainFromUrl(url) {
-    try {
-        const urlObj = new URL(url);
-        return urlObj.hostname.toLowerCase();
-    } catch (e) {
-        return null;
-    }
-}
-
-/**
- * Check if URL is from a URL shortener service
- */
-function isUrlShortener(domain) {
-    return URL_SHORTENERS.includes(domain);
-}
-
-/**
- * Check if domain has suspicious TLD
- */
-function hasSuspiciousTld(domain) {
-    for (const tld of SUSPICIOUS_TLDS) {
-        if (domain.endsWith(tld)) {
-            return tld;
-        }
-    }
-    return null;
-}
-
-/**
- * Check if URL domain looks like a known brand using existing brand databases
- */
-function checkUrlBrandLookalike(domain) {
-    // Get all legitimate domains from brand detection
-    const allLegitDomains = new Set();
-    
-    // From BRAND_CONTENT_DETECTION
-    Object.values(BRAND_CONTENT_DETECTION).forEach(brand => {
-        brand.legitimateDomains.forEach(d => {
-            if (!d.startsWith('.')) {  // Skip .gov patterns
-                allLegitDomains.add(d.toLowerCase());
-            }
-        });
-    });
-    
-    // From IMPERSONATION_TARGETS
-    Object.values(IMPERSONATION_TARGETS).forEach(domains => {
-        domains.forEach(d => {
-            if (!d.startsWith('.')) {  // Skip .gov patterns
-                allLegitDomains.add(d.toLowerCase());
-            }
-        });
-    });
-    
-    // Check if URL domain is similar to any legitimate domain
-    for (const legitDomain of allLegitDomains) {
-        if (domain === legitDomain) {
-            return null; // Exact match - legitimate
-        }
-        
-        // Check character substitution and similar techniques
-        const distance = levenshteinDistance(domain, legitDomain);
-        if (distance > 0 && distance <= 2 && domain.length >= 5) {
-            return {
-                suspiciousDomain: domain,
-                targetBrand: legitDomain,
-                similarity: `${distance} character difference`
-            };
-        }
-        
-        // Check for typosquatting patterns
-        if (domain.includes(legitDomain.replace('.com', '')) && domain !== legitDomain) {
-            return {
-                suspiciousDomain: domain,
-                targetBrand: legitDomain,
-                similarity: 'contains brand name with modifications'
-            };
-        }
-    }
-    
-    return null;
-}
-
-/**
- * Analyze a single URL for suspicious patterns
- */
-function analyzeUrl(url) {
-    const domain = extractDomainFromUrl(url);
-    if (!domain) {
-        return {
-            url: url,
-            riskLevel: 'medium',
-            reason: 'malformed URL',
-            details: 'URL could not be parsed properly'
-        };
-    }
-    
-    // Check cache first
-    const cacheKey = domain;
-    if (urlScanCache.has(cacheKey)) {
-        const cached = urlScanCache.get(cacheKey);
-        return { ...cached, url: url };
-    }
-    
-    let result = null;
-    
-    // Check for URL shorteners
-    if (URL_SCANNER_CONFIG.enableUrlShortenerDetection && isUrlShortener(domain)) {
-        result = {
-            url: url,
-            riskLevel: 'medium',
-            reason: 'URL shortener',
-            details: `Links shortened by ${domain} can hide the true destination`
-        };
-    }
-    
-    // Check for suspicious TLDs
-    if (!result && URL_SCANNER_CONFIG.enableSuspiciousTldDetection) {
-        const suspiciousTld = hasSuspiciousTld(domain);
-        if (suspiciousTld) {
-            result = {
-                url: url,
-                riskLevel: 'high',
-                reason: 'suspicious domain extension',
-                details: `Domain uses ${suspiciousTld} which is frequently used in phishing attacks`
-            };
-        }
-    }
-    
-    // Check for brand lookalikes
-    if (!result && URL_SCANNER_CONFIG.enableBrandLookalikeDetection) {
-        const brandLookalike = checkUrlBrandLookalike(domain);
-        if (brandLookalike) {
-            result = {
-                url: url,
-                riskLevel: 'high',
-                reason: 'brand impersonation in URL',
-                details: `Domain ${brandLookalike.suspiciousDomain} looks similar to legitimate ${brandLookalike.targetBrand} (${brandLookalike.similarity})`
-            };
-        }
-    }
-    
-    // Cache the result (domain only, not full URL)
-    if (result) {
-        const cacheResult = { ...result };
-        delete cacheResult.url; // Don't cache the specific URL
-        urlScanCache.set(cacheKey, cacheResult);
-    }
-    
-    return result;
-}
-
-/**
- * Main URL scanning function
- */
-function scanUrlsInEmail(emailText, emailHtml, senderTrusted) {
-    const scanStart = performance.now();
-    
-    // Skip scanning if sender is trusted (performance optimization)
-    if (senderTrusted) {
-        return {
-            scanned: false,
-            reason: 'trusted sender',
-            suspiciousUrls: [],
-            scanTimeMs: 0
-        };
-    }
-    
-    // Extract URLs
-    const urls = extractUrlsFromEmail(emailText, emailHtml);
-    
-    if (urls.length === 0) {
-        return {
-            scanned: true,
-            suspiciousUrls: [],
-            totalUrls: 0,
-            scanTimeMs: Math.round(performance.now() - scanStart)
-        };
-    }
-    
-    // Analyze each URL
-    const suspiciousUrls = [];
-    for (const url of urls) {
-        const analysis = analyzeUrl(url);
-        if (analysis) {
-            suspiciousUrls.push(analysis);
-        }
-    }
-    
-    const scanTimeMs = Math.round(performance.now() - scanStart);
-    
-    return {
-        scanned: true,
-        suspiciousUrls: suspiciousUrls,
-        totalUrls: urls.length,
-        scanTimeMs: scanTimeMs,
-        performanceLimited: urls.length >= URL_SCANNER_CONFIG.maxUrlsPerEmail
-    };
 }
 
 // ============================================
@@ -2015,57 +1753,52 @@ async function analyzeCurrentEmail() {
         const recipientCount = toRecipients.length + ccRecipients.length;
         
         item.body.getAsync(Office.CoercionType.Text, (bodyResult) => {
-            // Also get HTML content for URL scanning
-            item.body.getAsync(Office.CoercionType.Html, (htmlResult) => {
-                if (item.getAllInternetHeadersAsync) {
-                    item.getAllInternetHeadersAsync((headerResult) => {
-                        let replyTo = null;
-                        let senderHeader = null;
-                        if (headerResult.status === Office.AsyncResultStatus.Succeeded) {
-                            const headers = headerResult.value;
-                            const replyToMatch = headers.match(/^Reply-To:\s*(.+)$/mi);
-                            if (replyToMatch) {
-                                const emailMatch = replyToMatch[1].match(/<([^>]+)>/) || replyToMatch[1].match(/([^\s,]+@[^\s,]+)/);
-                                if (emailMatch) {
-                                    replyTo = emailMatch[1].trim();
-                                }
-                            }
-                            // v3.8.0: Parse Sender header for "on behalf of" detection
-                            const senderMatch = headers.match(/^Sender:\s*(.+)$/mi);
-                            if (senderMatch) {
-                                const senderEmailMatch = senderMatch[1].match(/<([^>]+)>/) || senderMatch[1].match(/([^\s,]+@[^\s,]+)/);
-                                if (senderEmailMatch) {
-                                    senderHeader = senderEmailMatch[1].trim();
-                                }
+            if (item.getAllInternetHeadersAsync) {
+                item.getAllInternetHeadersAsync((headerResult) => {
+                    let replyTo = null;
+                    let senderHeader = null;
+                    if (headerResult.status === Office.AsyncResultStatus.Succeeded) {
+                        const headers = headerResult.value;
+                        const replyToMatch = headers.match(/^Reply-To:\s*(.+)$/mi);
+                        if (replyToMatch) {
+                            const emailMatch = replyToMatch[1].match(/<([^>]+)>/) || replyToMatch[1].match(/([^\s,]+@[^\s,]+)/);
+                            if (emailMatch) {
+                                replyTo = emailMatch[1].trim();
                             }
                         }
-                        
-                        const emailData = {
-                            from: from,
-                            subject: subject,
-                            body: bodyResult.value || '',
-                            bodyHtml: htmlResult.value || '',
-                            replyTo: replyTo,
-                            senderHeader: senderHeader,
-                            recipientCount: recipientCount
-                        };
-                        
-                        processEmail(emailData);
-                    });
-                } else {
+                        // v3.8.0: Parse Sender header for "on behalf of" detection
+                        const senderMatch = headers.match(/^Sender:\s*(.+)$/mi);
+                        if (senderMatch) {
+                            const senderEmailMatch = senderMatch[1].match(/<([^>]+)>/) || senderMatch[1].match(/([^\s,]+@[^\s,]+)/);
+                            if (senderEmailMatch) {
+                                senderHeader = senderEmailMatch[1].trim();
+                            }
+                        }
+                    }
+                    
                     const emailData = {
                         from: from,
                         subject: subject,
                         body: bodyResult.value || '',
-                        bodyHtml: htmlResult.value || '',
-                        replyTo: null,
-                        senderHeader: null,
+                        replyTo: replyTo,
+                        senderHeader: senderHeader,
                         recipientCount: recipientCount
                     };
                     
                     processEmail(emailData);
-                }
-            });
+                });
+            } else {
+                const emailData = {
+                    from: from,
+                    subject: subject,
+                    body: bodyResult.value || '',
+                    replyTo: null,
+                    senderHeader: null,
+                    recipientCount: recipientCount
+                };
+                
+                processEmail(emailData);
+            }
         });
         
     } catch (error) {
@@ -2083,27 +1816,8 @@ function processEmail(emailData) {
     const senderHeader = emailData.senderHeader;
     
     const isKnownContact = knownContacts.has(senderEmail);
-    const isTrustedSender = isTrustedDomain(senderDomain);
     
     const warnings = [];
-    
-    // ============================================
-    // NEW v3.9.0: URL SCANNING
-    // ============================================
-    
-    // Scan URLs in email content
-    const urlScanResult = scanUrlsInEmail(emailData.body, emailData.bodyHtml, isTrustedSender);
-    if (urlScanResult.scanned && urlScanResult.suspiciousUrls.length > 0) {
-        warnings.push({
-            type: 'suspicious-urls',
-            severity: urlScanResult.suspiciousUrls.some(u => u.riskLevel === 'high') ? 'critical' : 'medium',
-            title: 'Suspicious Links Detected',
-            description: `This email contains ${urlScanResult.suspiciousUrls.length} suspicious link${urlScanResult.suspiciousUrls.length > 1 ? 's' : ''}.`,
-            suspiciousUrls: urlScanResult.suspiciousUrls,
-            totalUrls: urlScanResult.totalUrls,
-            scanTimeMs: urlScanResult.scanTimeMs
-        });
-    }
     
     // ============================================
     // NEW v3.5.0 CHECKS (run first - highest priority)
@@ -2429,9 +2143,8 @@ function displayResults(warnings) {
             'display-name-suspicion': 13,
             'international-sender': 14,
             'mass-recipients': 15,
-            'suspicious-urls': 16,
-            'wire-fraud': 17,
-            'phishing-urgency': 18
+            'wire-fraud': 16,
+            'phishing-urgency': 17
         };
         warnings.sort((a, b) => (WARNING_PRIORITY[a.type] || 99) - (WARNING_PRIORITY[b.type] || 99));
         
@@ -2453,29 +2166,6 @@ function displayResults(warnings) {
                     </div>
                     <div class="warning-advice">
                         <strong>Why this matters:</strong> ${w.keywordExplanation}
-                    </div>
-                `;
-            } else if (w.type === 'suspicious-urls') {
-                // v3.9.0: Display suspicious URLs
-                const urlDetails = w.suspiciousUrls.slice(0, 3).map(url => {
-                    const domain = extractDomainFromUrl(url.url) || url.url;
-                    return `
-                        <div class="warning-email-row">
-                            <span class="warning-email-label">${url.reason}:</span>
-                            <span class="warning-email-value suspicious" style="white-space: nowrap; font-family: monospace;">${domain}</span>
-                        </div>
-                    `;
-                }).join('');
-                
-                const moreText = w.suspiciousUrls.length > 3 ? `<div style="margin-top: 8px; font-size: 12px; color: #666;">+${w.suspiciousUrls.length - 3} more suspicious link${w.suspiciousUrls.length > 4 ? 's' : ''}</div>` : '';
-                
-                emailHtml = `
-                    <div class="warning-emails">
-                        ${urlDetails}
-                        ${moreText}
-                    </div>
-                    <div class="warning-advice">
-                        <strong>Why this matters:</strong> Suspicious links can redirect you to fake websites designed to steal your credentials or install malware.
                     </div>
                 `;
             } else if (w.type === 'org-impersonation') {
