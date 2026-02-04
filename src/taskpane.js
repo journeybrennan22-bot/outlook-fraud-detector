@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.8.0 - Updated: On-behalf-of detection, deduplicated brand/org warnings
+// Version 3.8.2 - Updated: Added business services, utilities, food delivery, fintech, retail
 
 // ============================================
 // CONFIGURATION
@@ -565,6 +565,150 @@ const BRAND_CONTENT_DETECTION = {
     'crypto.com': {
         keywords: ['crypto.com'],
         legitimateDomains: ['crypto.com']
+    },
+
+    // v3.8.2: Business Services
+    'salesforce': {
+        keywords: ['salesforce', 'salesforce account', 'salesforce login'],
+        legitimateDomains: ['salesforce.com', 'force.com', 'salesforce.org']
+    },
+    'slack': {
+        keywords: ['slack workspace', 'slack account', 'slack notification'],
+        legitimateDomains: ['slack.com', 'slack-edge.com']
+    },
+    'hubspot': {
+        keywords: ['hubspot', 'hubspot account', 'hubspot crm'],
+        legitimateDomains: ['hubspot.com', 'hs-analytics.net', 'hubspotemail.net']
+    },
+    'monday.com': {
+        keywords: ['monday.com', 'monday board', 'monday workspace'],
+        legitimateDomains: ['monday.com']
+    },
+    'asana': {
+        keywords: ['asana', 'asana task', 'asana project'],
+        legitimateDomains: ['asana.com']
+    },
+    'trello': {
+        keywords: ['trello', 'trello board', 'trello card'],
+        legitimateDomains: ['trello.com']
+    },
+    'notion': {
+        keywords: ['notion workspace', 'notion account'],
+        legitimateDomains: ['notion.so', 'notion.com']
+    },
+
+    // v3.8.2: Adobe (standalone)
+    'adobe': {
+        keywords: ['adobe account', 'adobe subscription', 'adobe creative cloud', 'adobe pdf'],
+        legitimateDomains: ['adobe.com', 'adobeid.services.adobe.com']
+    },
+
+    // v3.8.2: Buy Now Pay Later / Fintech
+    'afterpay': {
+        keywords: ['afterpay', 'after pay'],
+        legitimateDomains: ['afterpay.com']
+    },
+    'sofi': {
+        keywords: ['sofi', 'sofi account', 'sofi loan', 'sofi money'],
+        legitimateDomains: ['sofi.com', 'sofi.org']
+    },
+    'synchrony': {
+        keywords: ['synchrony', 'synchrony bank', 'synchrony financial'],
+        legitimateDomains: ['synchrony.com', 'synchronybank.com', 'mysynchrony.com']
+    },
+    'chime': {
+        keywords: ['chime', 'chime account', 'chime bank'],
+        legitimateDomains: ['chime.com']
+    },
+
+    // v3.8.2: Utilities
+    'pge': {
+        keywords: ['pg&e', 'pge', 'pacific gas', 'pacific gas and electric'],
+        legitimateDomains: ['pge.com']
+    },
+    'sce': {
+        keywords: ['southern california edison', 'sce', 'edison account'],
+        legitimateDomains: ['sce.com']
+    },
+    'con edison': {
+        keywords: ['con edison', 'coned', 'con ed'],
+        legitimateDomains: ['coned.com', 'conedison.com']
+    },
+    'duke energy': {
+        keywords: ['duke energy'],
+        legitimateDomains: ['duke-energy.com']
+    },
+    'national grid': {
+        keywords: ['national grid'],
+        legitimateDomains: ['nationalgrid.com', 'nationalgridus.com']
+    },
+    'fpl': {
+        keywords: ['florida power', 'fpl', 'florida power & light'],
+        legitimateDomains: ['fpl.com', 'nexteraenergy.com']
+    },
+    'sdge': {
+        keywords: ['san diego gas', 'sdge', 'sdg&e'],
+        legitimateDomains: ['sdge.com']
+    },
+    'dominion energy': {
+        keywords: ['dominion energy', 'dominion power'],
+        legitimateDomains: ['dominionenergy.com']
+    },
+
+    // v3.8.2: Food Delivery
+    'doordash': {
+        keywords: ['doordash', 'door dash'],
+        legitimateDomains: ['doordash.com']
+    },
+    'uber eats': {
+        keywords: ['uber eats', 'ubereats'],
+        legitimateDomains: ['uber.com', 'ubereats.com']
+    },
+    'grubhub': {
+        keywords: ['grubhub', 'grub hub'],
+        legitimateDomains: ['grubhub.com']
+    },
+    'instacart': {
+        keywords: ['instacart'],
+        legitimateDomains: ['instacart.com']
+    },
+
+    // v3.8.2: Rideshare & Other Retail
+    'uber': {
+        keywords: ['uber account', 'uber ride', 'uber trip'],
+        legitimateDomains: ['uber.com']
+    },
+    'lyft': {
+        keywords: ['lyft', 'lyft ride', 'lyft account'],
+        legitimateDomains: ['lyft.com']
+    },
+    'etsy': {
+        keywords: ['etsy', 'etsy shop', 'etsy order'],
+        legitimateDomains: ['etsy.com']
+    },
+    'wayfair': {
+        keywords: ['wayfair', 'wayfair order'],
+        legitimateDomains: ['wayfair.com']
+    },
+    'ikea': {
+        keywords: ['ikea', 'ikea order'],
+        legitimateDomains: ['ikea.com']
+    },
+    'samsclub': {
+        keywords: ['sam\'s club', 'sams club', 'samsclub'],
+        legitimateDomains: ['samsclub.com']
+    },
+    'macys': {
+        keywords: ['macy\'s', 'macys'],
+        legitimateDomains: ['macys.com']
+    },
+    'kohls': {
+        keywords: ['kohl\'s', 'kohls'],
+        legitimateDomains: ['kohls.com']
+    },
+    'jcpenney': {
+        keywords: ['jcpenney', 'jc penney', 'penney\'s'],
+        legitimateDomains: ['jcpenney.com']
     }
 };
 
@@ -895,8 +1039,77 @@ const IMPERSONATION_TARGETS = {
     "kraken": ["kraken.com"],
     "crypto.com": ["crypto.com"],
     "gemini": ["gemini.com"],
-    "opensea": ["opensea.io"]
+    "opensea": ["opensea.io"],
 
+    // v3.8.2: Business Services
+    "salesforce": ["salesforce.com", "force.com"],
+    "salesforce support": ["salesforce.com"],
+    "slack": ["slack.com"],
+    "slack support": ["slack.com"],
+    "hubspot": ["hubspot.com"],
+    "monday.com": ["monday.com"],
+    "monday": ["monday.com"],
+    "asana": ["asana.com"],
+    "trello": ["trello.com"],
+    "notion": ["notion.so", "notion.com"],
+
+    // v3.8.2: Adobe (standalone)
+    "adobe": ["adobe.com"],
+    "adobe account": ["adobe.com"],
+    "adobe support": ["adobe.com"],
+    "adobe creative cloud": ["adobe.com"],
+
+    // v3.8.2: Buy Now Pay Later / Fintech
+    "afterpay": ["afterpay.com"],
+    "sofi": ["sofi.com"],
+    "sofi bank": ["sofi.com"],
+    "synchrony": ["synchrony.com", "synchronybank.com", "mysynchrony.com"],
+    "synchrony bank": ["synchrony.com", "synchronybank.com"],
+    "chime": ["chime.com"],
+    "chime bank": ["chime.com"],
+
+    // v3.8.2: Utilities
+    "pg&e": ["pge.com"],
+    "pge": ["pge.com"],
+    "pacific gas and electric": ["pge.com"],
+    "southern california edison": ["sce.com"],
+    "sce": ["sce.com"],
+    "edison": ["sce.com"],
+    "con edison": ["coned.com", "conedison.com"],
+    "coned": ["coned.com", "conedison.com"],
+    "duke energy": ["duke-energy.com"],
+    "national grid": ["nationalgrid.com", "nationalgridus.com"],
+    "florida power": ["fpl.com"],
+    "fpl": ["fpl.com"],
+    "sdge": ["sdge.com"],
+    "san diego gas": ["sdge.com"],
+    "dominion energy": ["dominionenergy.com"],
+
+    // v3.8.2: Food Delivery
+    "doordash": ["doordash.com"],
+    "doordash support": ["doordash.com"],
+    "uber eats": ["uber.com", "ubereats.com"],
+    "ubereats": ["uber.com", "ubereats.com"],
+    "grubhub": ["grubhub.com"],
+    "instacart": ["instacart.com"],
+
+    // v3.8.2: Rideshare & Other Retail
+    "uber": ["uber.com"],
+    "uber support": ["uber.com"],
+    "lyft": ["lyft.com"],
+    "lyft support": ["lyft.com"],
+    "etsy": ["etsy.com"],
+    "etsy support": ["etsy.com"],
+    "wayfair": ["wayfair.com"],
+    "ikea": ["ikea.com"],
+    "sam's club": ["samsclub.com"],
+    "sams club": ["samsclub.com"],
+    "macy's": ["macys.com"],
+    "macys": ["macys.com"],
+    "kohl's": ["kohls.com"],
+    "kohls": ["kohls.com"],
+    "jcpenney": ["jcpenney.com"],
+    "jc penney": ["jcpenney.com"]
 };
 
 // ============================================
@@ -1023,14 +1236,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v3.8.0 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v3.8.2 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.8.0 initializing for Outlook...');
+        console.log('Email Fraud Detector v3.8.2 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v3.8.0 ready');
+        console.log('Email Fraud Detector v3.8.2 ready');
     }
 });
 
