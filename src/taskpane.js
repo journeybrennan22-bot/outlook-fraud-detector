@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 3.8.2 - Updated: Added business services, utilities, food delivery, fintech, retail
+// Version 4.0.1 - Updated: Added comprehensive fake country TLD detection
 
 // ============================================
 // CONFIGURATION
@@ -76,7 +76,11 @@ const INTERNATIONAL_TLDS = [
 ];
 
 // Fake country-lookalike TLDs (commercial services mimicking real TLDs)
-const FAKE_COUNTRY_TLDS = ['.us.com', '.uk.com', '.co.uk.com', '.eu.com', '.de.com', '.br.com', '.au.com', '.cn.com', '.jp.com', '.kr.com', '.ru.com', '.sa.com', '.za.com'];
+// Built programmatically to cover all country codes + common gTLDs
+const FAKE_COUNTRY_CODES = ['ae', 'ar', 'at', 'au', 'be', 'br', 'ca', 'ch', 'cl', 'cn', 'co', 'cz', 'de', 'dk', 'eg', 'es', 'eu', 'fi', 'fr', 'gr', 'hk', 'hu', 'id', 'ie', 'il', 'in', 'it', 'jp', 'ke', 'kr', 'mx', 'my', 'ng', 'nl', 'no', 'nz', 'pe', 'ph', 'pk', 'pl', 'pt', 'ro', 'ru', 'sa', 'se', 'sg', 'th', 'tr', 'tw', 'ua', 'uk', 'us', 've', 'vn', 'za'];
+const FAKE_GTLDS = ['.com', '.net', '.org', '.info', '.biz'];
+const FAKE_COUNTRY_TLDS = FAKE_COUNTRY_CODES.flatMap(cc => FAKE_GTLDS.map(gtld => '.' + cc + gtld));
+FAKE_COUNTRY_TLDS.push('.co.uk.com'); // Also catch this compound variant
 
 // Suspicious words commonly used in fake domains
 const SUSPICIOUS_DOMAIN_WORDS = [
@@ -1236,14 +1240,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v3.8.2 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v4.0.1 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v3.8.2 initializing for Outlook...');
+        console.log('Email Fraud Detector v4.0.1 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v3.8.2 ready');
+        console.log('Email Fraud Detector v4.0.1 ready');
     }
 });
 
