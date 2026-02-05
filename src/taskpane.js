@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 4.0.1 - Updated: Added comprehensive fake country TLD detection
+// Version 4.0.4 - Expanded suspicious TLDs list (added 23 high-abuse domains)
 
 // ============================================
 // CONFIGURATION
@@ -1240,14 +1240,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v4.0.1 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v4.0.4 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v4.0.1 initializing for Outlook...');
+        console.log('Email Fraud Detector v4.0.4 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v4.0.1 ready');
+        console.log('Email Fraud Detector v4.0.4 ready');
     }
 });
 
@@ -1568,7 +1568,8 @@ function detectGibberishDomain(email) {
     }
     
     // Check 3: Suspicious TLD combined with other signals
-    const suspiciousTLDs = ['.us', '.tk', '.ml', '.ga', '.cf', '.gq', '.pw', '.cc', '.ws', '.top', '.xyz', '.buzz', '.biz', '.info', '.shop', '.club', '.icu'];
+    // v4.0.4: Expanded suspicious TLDs list
+    const suspiciousTLDs = ['.us', '.tk', '.ml', '.ga', '.cf', '.gq', '.pw', '.cc', '.ws', '.top', '.xyz', '.buzz', '.cloud', '.online', '.site', '.website', '.store', '.live', '.icu', '.shop', '.club', '.info', '.biz', '.work', '.click', '.link', '.fun', '.space', '.vip', '.win', '.download', '.stream', '.review', '.bid', '.loan', '.date', '.trade', '.racing', '.party', '.cricket', '.science', '.gdn', '.rest', '.fit', '.mom', '.sbs'];
     const tld = '.' + domainParts[domainParts.length - 1];
     if (suspiciousTLDs.includes(tld) && suspicionScore > 0) {
         suspicionScore += 1;
