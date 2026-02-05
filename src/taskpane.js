@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 4.0.5 - Tiered digit ratio scoring (>50% = +3, >30% = +2)
+// Version 4.1.0 - Enhanced gibberish detection (vowel ratio + length checks)
 
 // ============================================
 // CONFIGURATION
@@ -81,6 +81,7 @@ const FAKE_COUNTRY_CODES = ['ae', 'ar', 'at', 'au', 'be', 'br', 'ca', 'ch', 'cl'
 const FAKE_GTLDS = ['.com', '.net', '.org', '.info', '.biz'];
 const FAKE_COUNTRY_TLDS = FAKE_COUNTRY_CODES.flatMap(cc => FAKE_GTLDS.map(gtld => '.' + cc + gtld));
 FAKE_COUNTRY_TLDS.push('.co.uk.com'); // Also catch this compound variant
+FAKE_COUNTRY_TLDS.push('.co.us'); // v4.1.0: Heavily abused compound TLD
 
 // Suspicious words commonly used in fake domains
 const SUSPICIOUS_DOMAIN_WORDS = [
@@ -232,7 +233,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['zoom meeting', 'zoom invitation', 'zoom account'],
         legitimateDomains: ['zoom.us', 'zoom.com']
     },
-    // v3.7.0: Major Retailers
     'walmart': {
         keywords: ['walmart', 'wal-mart'],
         legitimateDomains: ['walmart.com']
@@ -261,7 +261,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['ebay'],
         legitimateDomains: ['ebay.com']
     },
-    // v3.8.0: Government Agencies
     'dmv': {
         keywords: ['department of motor vehicles', 'dmv service desk', 'dmv appointment', 'dmv registration'],
         legitimateDomains: ['.gov']
@@ -274,8 +273,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['social security administration', 'social security number', 'ssa benefit', 'social security statement'],
         legitimateDomains: ['ssa.gov']
     },
-
-    // v3.8.1: Telecom
     'att': {
         keywords: ['at&t', 'att account', 'att wireless'],
         legitimateDomains: ['att.com', 'att.net']
@@ -296,8 +293,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['spectrum internet', 'spectrum account', 'spectrum mobile'],
         legitimateDomains: ['spectrum.com', 'spectrum.net', 'charter.com']
     },
-
-    // v3.8.1: Social Media
     'whatsapp': {
         keywords: ['whatsapp'],
         legitimateDomains: ['whatsapp.com']
@@ -318,8 +313,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['snapchat account', 'snapchat security'],
         legitimateDomains: ['snapchat.com']
     },
-
-    // v3.8.1: Gaming
     'steam': {
         keywords: ['steam account', 'steam guard', 'steam wallet'],
         legitimateDomains: ['steampowered.com', 'store.steampowered.com', 'steamcommunity.com']
@@ -340,8 +333,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['epic games', 'fortnite account', 'epic account'],
         legitimateDomains: ['epicgames.com', 'unrealengine.com']
     },
-
-    // v3.8.1: Streaming
     'spotify': {
         keywords: ['spotify', 'spotify premium', 'spotify account'],
         legitimateDomains: ['spotify.com']
@@ -370,8 +361,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['paramount+', 'paramount plus'],
         legitimateDomains: ['paramountplus.com', 'paramount.com']
     },
-
-    // v3.8.1: Financial Services & Credit Cards
     'visa': {
         keywords: ['visa card', 'visa account', 'visa security'],
         legitimateDomains: ['visa.com']
@@ -416,8 +405,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['klarna payment', 'klarna account'],
         legitimateDomains: ['klarna.com']
     },
-
-    // v3.8.1: Insurance - Auto/Home
     'state farm': {
         keywords: ['state farm'],
         legitimateDomains: ['statefarm.com']
@@ -462,8 +449,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['erie insurance'],
         legitimateDomains: ['erieinsurance.com']
     },
-
-    // v3.8.1: Insurance - Health
     'unitedhealthcare': {
         keywords: ['unitedhealthcare', 'united healthcare', 'uhc'],
         legitimateDomains: ['uhc.com', 'unitedhealthcare.com', 'myuhc.com', 'optum.com']
@@ -488,8 +473,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['aetna'],
         legitimateDomains: ['aetna.com']
     },
-
-    // v3.8.1: Insurance - Life & General
     'metlife': {
         keywords: ['metlife'],
         legitimateDomains: ['metlife.com']
@@ -510,14 +493,10 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['aflac'],
         legitimateDomains: ['aflac.com']
     },
-
-    // v3.8.1: Auto/Membership
     'aaa': {
         keywords: ['aaa membership', 'aaa roadside', 'aaa insurance'],
         legitimateDomains: ['aaa.com', 'ace.aaa.com', 'calif.aaa.com']
     },
-
-    // v3.8.1: Travel
     'booking.com': {
         keywords: ['booking.com', 'booking confirmation'],
         legitimateDomains: ['booking.com']
@@ -546,8 +525,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['american airlines', 'aadvantage'],
         legitimateDomains: ['aa.com', 'americanairlines.com']
     },
-
-    // v3.8.1: Security Software
     'norton': {
         keywords: ['norton', 'nortonlifelock', 'norton 360'],
         legitimateDomains: ['norton.com', 'nortonlifelock.com', 'gen.digital']
@@ -556,8 +533,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['avast'],
         legitimateDomains: ['avast.com']
     },
-
-    // v3.8.1: Crypto
     'binance': {
         keywords: ['binance'],
         legitimateDomains: ['binance.com']
@@ -570,8 +545,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['crypto.com'],
         legitimateDomains: ['crypto.com']
     },
-
-    // v3.8.2: Business Services
     'salesforce': {
         keywords: ['salesforce', 'salesforce account', 'salesforce login'],
         legitimateDomains: ['salesforce.com', 'force.com', 'salesforce.org']
@@ -600,14 +573,10 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['notion workspace', 'notion account'],
         legitimateDomains: ['notion.so', 'notion.com']
     },
-
-    // v3.8.2: Adobe (standalone)
     'adobe': {
         keywords: ['adobe account', 'adobe subscription', 'adobe creative cloud', 'adobe pdf'],
         legitimateDomains: ['adobe.com', 'adobeid.services.adobe.com']
     },
-
-    // v3.8.2: Buy Now Pay Later / Fintech
     'afterpay': {
         keywords: ['afterpay', 'after pay'],
         legitimateDomains: ['afterpay.com']
@@ -624,8 +593,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['chime', 'chime account', 'chime bank'],
         legitimateDomains: ['chime.com']
     },
-
-    // v3.8.2: Utilities
     'pge': {
         keywords: ['pg&e', 'pge', 'pacific gas', 'pacific gas and electric'],
         legitimateDomains: ['pge.com']
@@ -658,8 +625,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['dominion energy', 'dominion power'],
         legitimateDomains: ['dominionenergy.com']
     },
-
-    // v3.8.2: Food Delivery
     'doordash': {
         keywords: ['doordash', 'door dash'],
         legitimateDomains: ['doordash.com']
@@ -676,8 +641,6 @@ const BRAND_CONTENT_DETECTION = {
         keywords: ['instacart'],
         legitimateDomains: ['instacart.com']
     },
-
-    // v3.8.2: Rideshare & Other Retail
     'uber': {
         keywords: ['uber account', 'uber ride', 'uber trip'],
         legitimateDomains: ['uber.com']
@@ -720,7 +683,6 @@ const BRAND_CONTENT_DETECTION = {
 // ORGANIZATION IMPERSONATION TARGETS
 // ============================================
 const IMPERSONATION_TARGETS = {
-    // US Government - Federal
     "social security": ["ssa.gov"],
     "social security administration": ["ssa.gov"],
     "internal revenue service": ["irs.gov"],
@@ -750,8 +712,6 @@ const IMPERSONATION_TARGETS = {
     "student aid": ["studentaid.gov", "ed.gov"],
     "fafsa": ["studentaid.gov", "ed.gov"],
     "department of education": ["ed.gov"],
-
-    // Shipping & Postal
     "usps": ["usps.com"],
     "postal service": ["usps.com"],
     "us postal service": ["usps.com"],
@@ -761,8 +721,6 @@ const IMPERSONATION_TARGETS = {
     "fedex": ["fedex.com"],
     "federal express": ["fedex.com"],
     "dhl": ["dhl.com"],
-
-    // Major Banks
     "wells fargo": ["wellsfargo.com", "wf.com", "notify.wellsfargo.com"],
     "bank of america": ["bankofamerica.com", "bofa.com"],
     "chase bank": ["chase.com", "jpmorganchase.com"],
@@ -785,8 +743,6 @@ const IMPERSONATION_TARGETS = {
     "navy federal": ["navyfederal.org"],
     "navy federal credit union": ["navyfederal.org"],
     "usaa": ["usaa.com"],
-
-    // Tech Companies - PHRASES ONLY
     "microsoft support": ["microsoft.com"],
     "microsoft account": ["microsoft.com", "live.com"],
     "microsoft security": ["microsoft.com"],
@@ -801,35 +757,25 @@ const IMPERSONATION_TARGETS = {
     "amazon security": ["amazon.com"],
     "netflix support": ["netflix.com"],
     "netflix account": ["netflix.com"],
-
-    // Document Signing / Business Tools
     "docusign": ["docusign.com", "docusign.net"],
     "adobe sign": ["adobe.com", "adobesign.com"],
     "intuit": ["intuit.com"],
     "quickbooks": ["intuit.com", "quickbooks.com"],
     "turbotax": ["intuit.com", "turbotax.com"],
-
-    // Payment Platforms
     "paypal": ["paypal.com"],
     "venmo": ["venmo.com"],
     "zelle": ["zellepay.com"],
     "cash app": ["cash.app", "square.com"],
     "cashapp": ["cash.app", "square.com"],
-
-    // Credit Bureaus
     "equifax": ["equifax.com"],
     "experian": ["experian.com"],
     "transunion": ["transunion.com"],
-
-    // Title & Escrow Companies
     "fidelity national title": ["fnf.com", "fntg.com"],
     "first american title": ["firstam.com"],
     "first american": ["firstam.com"],
     "chicago title": ["chicagotitle.com", "fnf.com"],
     "stewart title": ["stewart.com"],
     "old republic title": ["oldrepublictitle.com", "oldrepublic.com"],
-
-    // v3.7.0: Major Retailers
     "walmart": ["walmart.com"],
     "walmart customer support": ["walmart.com"],
     "target": ["target.com"],
@@ -840,8 +786,6 @@ const IMPERSONATION_TARGETS = {
     "home depot": ["homedepot.com"],
     "lowes": ["lowes.com"],
     "ebay": ["ebay.com"],
-
-    // v3.8.0: State Government Agencies
     "dmv": [".gov"],
     "dmv service desk": [".gov"],
     "department of motor vehicles": [".gov"],
@@ -855,8 +799,6 @@ const IMPERSONATION_TARGETS = {
     "department of revenue": [".gov"],
     "state attorney general": [".gov"],
     "attorney general": [".gov"],
-
-    // v3.8.1: Telecom
     "at&t": ["att.com", "att.net"],
     "att": ["att.com", "att.net"],
     "att wireless": ["att.com"],
@@ -872,8 +814,6 @@ const IMPERSONATION_TARGETS = {
     "cricket wireless": ["cricketwireless.com"],
     "metro by t-mobile": ["t-mobile.com", "metrobyt-mobile.com"],
     "boost mobile": ["boostmobile.com"],
-
-    // v3.8.1: Social Media
     "whatsapp": ["whatsapp.com"],
     "whatsapp support": ["whatsapp.com"],
     "instagram": ["instagram.com", "mail.instagram.com"],
@@ -887,8 +827,6 @@ const IMPERSONATION_TARGETS = {
     "pinterest": ["pinterest.com"],
     "reddit": ["reddit.com", "redditmail.com"],
     "threads": ["threads.net", "instagram.com"],
-
-    // v3.8.1: Gaming
     "steam": ["steampowered.com", "store.steampowered.com", "steamcommunity.com"],
     "steam support": ["steampowered.com"],
     "valve": ["valvesoftware.com", "steampowered.com"],
@@ -908,8 +846,6 @@ const IMPERSONATION_TARGETS = {
     "riot games": ["riotgames.com"],
     "blizzard": ["blizzard.com", "battle.net"],
     "battle.net": ["blizzard.com", "battle.net"],
-
-    // v3.8.1: Streaming
     "spotify": ["spotify.com"],
     "spotify support": ["spotify.com"],
     "disney+": ["disneyplus.com", "disney.com"],
@@ -925,8 +861,6 @@ const IMPERSONATION_TARGETS = {
     "paramount plus": ["paramountplus.com", "paramount.com"],
     "peacock": ["peacocktv.com", "nbcuni.com"],
     "apple tv": ["apple.com"],
-
-    // v3.8.1: Financial Services & Credit Cards
     "visa": ["visa.com"],
     "visa card": ["visa.com"],
     "mastercard": ["mastercard.com"],
@@ -948,8 +882,6 @@ const IMPERSONATION_TARGETS = {
     "transferwise": ["wise.com"],
     "affirm": ["affirm.com"],
     "klarna": ["klarna.com"],
-
-    // v3.8.1: Insurance - Auto/Home
     "state farm": ["statefarm.com"],
     "state farm insurance": ["statefarm.com"],
     "geico": ["geico.com"],
@@ -971,8 +903,6 @@ const IMPERSONATION_TARGETS = {
     "erie insurance": ["erieinsurance.com"],
     "shelter insurance": ["shelterinsurance.com"],
     "auto-owners insurance": ["auto-owners.com"],
-
-    // v3.8.1: Insurance - Health
     "unitedhealthcare": ["uhc.com", "unitedhealthcare.com", "myuhc.com", "optum.com"],
     "united healthcare": ["uhc.com", "unitedhealthcare.com", "myuhc.com"],
     "uhc": ["uhc.com", "unitedhealthcare.com"],
@@ -988,8 +918,6 @@ const IMPERSONATION_TARGETS = {
     "aetna": ["aetna.com"],
     "molina healthcare": ["molinahealthcare.com"],
     "centene": ["centene.com"],
-
-    // v3.8.1: Insurance - Life & General
     "metlife": ["metlife.com"],
     "prudential": ["prudential.com"],
     "prudential financial": ["prudential.com"],
@@ -1003,13 +931,9 @@ const IMPERSONATION_TARGETS = {
     "massmutual": ["massmutual.com"],
     "transamerica": ["transamerica.com"],
     "mutual of omaha": ["mutualofomaha.com"],
-
-    // v3.8.1: Auto/Membership
     "aaa": ["aaa.com"],
     "aaa roadside": ["aaa.com"],
     "aaa insurance": ["aaa.com"],
-
-    // v3.8.1: Travel & Airlines
     "booking.com": ["booking.com"],
     "airbnb": ["airbnb.com"],
     "airbnb support": ["airbnb.com"],
@@ -1027,8 +951,6 @@ const IMPERSONATION_TARGETS = {
     "alaska airlines": ["alaskaair.com"],
     "frontier airlines": ["flyfrontier.com"],
     "spirit airlines": ["spirit.com"],
-
-    // v3.8.1: Security Software
     "norton": ["norton.com", "nortonlifelock.com", "gen.digital"],
     "nortonlifelock": ["norton.com", "nortonlifelock.com"],
     "norton 360": ["norton.com"],
@@ -1037,15 +959,11 @@ const IMPERSONATION_TARGETS = {
     "kaspersky": ["kaspersky.com"],
     "bitdefender": ["bitdefender.com"],
     "malwarebytes": ["malwarebytes.com"],
-
-    // v3.8.1: Crypto
     "binance": ["binance.com"],
     "kraken": ["kraken.com"],
     "crypto.com": ["crypto.com"],
     "gemini": ["gemini.com"],
     "opensea": ["opensea.io"],
-
-    // v3.8.2: Business Services
     "salesforce": ["salesforce.com", "force.com"],
     "salesforce support": ["salesforce.com"],
     "slack": ["slack.com"],
@@ -1056,14 +974,10 @@ const IMPERSONATION_TARGETS = {
     "asana": ["asana.com"],
     "trello": ["trello.com"],
     "notion": ["notion.so", "notion.com"],
-
-    // v3.8.2: Adobe (standalone)
     "adobe": ["adobe.com"],
     "adobe account": ["adobe.com"],
     "adobe support": ["adobe.com"],
     "adobe creative cloud": ["adobe.com"],
-
-    // v3.8.2: Buy Now Pay Later / Fintech
     "afterpay": ["afterpay.com"],
     "sofi": ["sofi.com"],
     "sofi bank": ["sofi.com"],
@@ -1071,8 +985,6 @@ const IMPERSONATION_TARGETS = {
     "synchrony bank": ["synchrony.com", "synchronybank.com"],
     "chime": ["chime.com"],
     "chime bank": ["chime.com"],
-
-    // v3.8.2: Utilities
     "pg&e": ["pge.com"],
     "pge": ["pge.com"],
     "pacific gas and electric": ["pge.com"],
@@ -1088,16 +1000,12 @@ const IMPERSONATION_TARGETS = {
     "sdge": ["sdge.com"],
     "san diego gas": ["sdge.com"],
     "dominion energy": ["dominionenergy.com"],
-
-    // v3.8.2: Food Delivery
     "doordash": ["doordash.com"],
     "doordash support": ["doordash.com"],
     "uber eats": ["uber.com", "ubereats.com"],
     "ubereats": ["uber.com", "ubereats.com"],
     "grubhub": ["grubhub.com"],
     "instacart": ["instacart.com"],
-
-    // v3.8.2: Rideshare & Other Retail
     "uber": ["uber.com"],
     "uber support": ["uber.com"],
     "lyft": ["lyft.com"],
@@ -1219,10 +1127,10 @@ function getKeywordExplanation(keyword) {
 
 // Homoglyph characters (Cyrillic only)
 const HOMOGLYPHS = {
-    'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'х': 'x',
-    'і': 'i', 'ј': 'j', 'ѕ': 's', 'ԁ': 'd', 'ɡ': 'g', 'ո': 'n',
-    'ν': 'v', 'ѡ': 'w', 'у': 'y', 'һ': 'h', 'ⅼ': 'l', 'ｍ': 'm',
-    '！': '!', '＠': '@'
+    '\u0430': 'a', '\u0435': 'e', '\u043e': 'o', '\u0440': 'p', '\u0441': 'c', '\u0445': 'x',
+    '\u0456': 'i', '\u0458': 'j', '\u0455': 's', '\u0501': 'd', '\u0261': 'g', '\u0578': 'n',
+    '\u03bd': 'v', '\u0461': 'w', '\u0443': 'y', '\u04bb': 'h', '\u217c': 'l', '\uff4d': 'm',
+    '\uff01': '!', '\uff20': '@'
 };
 
 // ============================================
@@ -1240,14 +1148,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v4.0.5 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v4.1.0 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v4.0.5 initializing for Outlook...');
+        console.log('Email Fraud Detector v4.1.0 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v4.0.5 ready');
+        console.log('Email Fraud Detector v4.1.0 ready');
     }
 });
 
@@ -1458,7 +1366,6 @@ function levenshteinDistance(a, b) {
 
 /**
  * NEW v3.5.0: Detect recipient self-spoofing
- * Catches when display name matches the recipient's own email/name
  */
 function detectRecipientSpoofing(displayName, senderEmail) {
     if (!displayName || !currentUserEmail) return null;
@@ -1467,14 +1374,11 @@ function detectRecipientSpoofing(displayName, senderEmail) {
     const recipientLower = currentUserEmail.toLowerCase();
     const recipientUsername = recipientLower.split('@')[0];
     
-    // Clean display name and recipient (remove dots, underscores, spaces)
     const displayCleaned = displayLower.replace(/[\.\-_\s]/g, '');
     const recipientCleaned = recipientUsername.replace(/[\.\-_\s]/g, '');
     
-    // Check if display name contains recipient's username (or vice versa)
     if (displayCleaned.length >= 4 && recipientCleaned.length >= 4) {
         if (displayCleaned.includes(recipientCleaned) || recipientCleaned.includes(displayCleaned)) {
-            // Make sure it's not actually FROM the recipient
             const senderLower = senderEmail.toLowerCase();
             if (!senderLower.includes(recipientUsername)) {
                 return {
@@ -1490,7 +1394,6 @@ function detectRecipientSpoofing(displayName, senderEmail) {
 
 /**
  * NEW v3.5.0: Detect phishing urgency keywords
- * Different from wire fraud - focuses on account threats
  */
 function detectPhishingUrgency(bodyText, subject) {
     if (!bodyText && !subject) return null;
@@ -1504,7 +1407,6 @@ function detectPhishingUrgency(bodyText, subject) {
         }
     }
     
-    // Need at least 2 urgency keywords to trigger
     if (foundKeywords.length >= 2) {
         return {
             keywords: foundKeywords.slice(0, 4)
@@ -1515,7 +1417,8 @@ function detectPhishingUrgency(bodyText, subject) {
 }
 
 /**
- * NEW v3.5.0: Detect gibberish domain
+ * v4.1.0: Enhanced gibberish domain detection
+ * Added: consonant-to-vowel ratio check, excessive length check
  * Uses scoring system to avoid false positives
  */
 function detectGibberishDomain(email) {
@@ -1534,7 +1437,6 @@ function detectGibberishDomain(email) {
     const reasons = [];
     
     // Check 1: High digit ratio in main domain part
-    // v4.0.5: Tiered scoring - very high (>50%) gets +3, high (>30%) gets +2
     if (mainPart.length > 3) {
         const digitCount = (mainPart.match(/\d/g) || []).length;
         const digitRatio = digitCount / mainPart.length;
@@ -1572,7 +1474,6 @@ function detectGibberishDomain(email) {
     }
     
     // Check 3: Suspicious TLD combined with other signals
-    // v4.0.4: Expanded suspicious TLDs list
     const suspiciousTLDs = ['.us', '.tk', '.ml', '.ga', '.cf', '.gq', '.pw', '.cc', '.ws', '.top', '.xyz', '.buzz', '.cloud', '.online', '.site', '.website', '.store', '.live', '.icu', '.shop', '.club', '.info', '.biz', '.work', '.click', '.link', '.fun', '.space', '.vip', '.win', '.download', '.stream', '.review', '.bid', '.loan', '.date', '.trade', '.racing', '.party', '.cricket', '.science', '.gdn', '.rest', '.fit', '.mom', '.sbs'];
     const tld = '.' + domainParts[domainParts.length - 1];
     if (suspiciousTLDs.includes(tld) && suspicionScore > 0) {
@@ -1587,6 +1488,30 @@ function detectGibberishDomain(email) {
             suspicionScore += 3;
             reasons.push('no vowels in domain');
         }
+    }
+    
+    // Check 5 (v4.1.0): Low vowel-to-letter ratio
+    // Normal English: ~40% vowels. Gibberish: 10-20%.
+    // Only fires on 8+ char domains with 6+ letters and at least 1 vowel
+    if (mainPart.length >= 8) {
+        const letterCount = (mainPart.match(/[a-z]/gi) || []).length;
+        if (letterCount >= 6) {
+            const vowelCount = (mainPart.match(/[aeiou]/gi) || []).length;
+            const vowelRatio = vowelCount / letterCount;
+            if (vowelRatio > 0 && vowelRatio < 0.22) {
+                suspicionScore += 2;
+                reasons.push('unpronounceable pattern');
+            }
+        }
+    }
+    
+    // Check 6 (v4.1.0): Excessive domain length
+    if (mainPart.length > 20) {
+        suspicionScore += 2;
+        reasons.push('very long domain name');
+    } else if (mainPart.length >= 15) {
+        suspicionScore += 1;
+        reasons.push('long domain name');
     }
     
     // Need score of 3+ to trigger
@@ -1624,7 +1549,6 @@ function detectBrandImpersonation(subject, body, senderDomain) {
             
             const domainLower = senderDomain.toLowerCase();
             const isLegitimate = config.legitimateDomains.some(legit => {
-                // v3.8.0: Handle suffix patterns like ".gov" for government agencies
                 if (legit.startsWith('.')) {
                     return domainLower.endsWith(legit);
                 }
@@ -1658,7 +1582,6 @@ function detectOrganizationImpersonation(displayName, senderDomain) {
         
         if (entityPattern.test(searchText)) {
             const isLegitimate = legitimateDomains.some(legit => {
-                // v3.8.0: Handle suffix patterns like ".gov" for government agencies
                 if (legit.startsWith('.')) {
                     return senderDomain.endsWith(legit);
                 }
@@ -1666,7 +1589,6 @@ function detectOrganizationImpersonation(displayName, senderDomain) {
             });
             
             if (!isLegitimate) {
-                // v3.8.0: Better messaging for government agencies
                 const hasGovSuffix = legitimateDomains.some(d => d === '.gov');
                 const displayDomains = hasGovSuffix ? 'official .gov domains' : legitimateDomains.join(', ');
                 return {
@@ -1683,18 +1605,14 @@ function detectOrganizationImpersonation(displayName, senderDomain) {
 }
 
 /**
- * v3.6.0: Detect international sender (formerly "deceptive TLD")
- * Returns country information for foreign domains
+ * v3.6.0: Detect international sender
  */
 function detectInternationalSender(domain) {
     const domainLower = domain.toLowerCase();
     
-    // Check compound TLDs first (more specific)
     for (const [tld, country] of Object.entries(COUNTRY_CODE_TLDS)) {
         if (tld.includes('.') && tld.split('.').length > 2) {
-            // This is a compound TLD like .com.br
             if (domainLower.endsWith(tld)) {
-                // Only flag if it's in our warning list
                 if (INTERNATIONAL_TLDS.some(t => domainLower.endsWith(t))) {
                     return { tld, country };
                 }
@@ -1702,7 +1620,6 @@ function detectInternationalSender(domain) {
         }
     }
     
-    // Then check single ccTLDs
     for (const tld of INTERNATIONAL_TLDS) {
         if (domainLower.endsWith(tld)) {
             const country = COUNTRY_CODE_TLDS[tld] || 'Unknown';
@@ -1719,7 +1636,6 @@ function detectInternationalSender(domain) {
 function detectSuspiciousDomain(domain) {
     const domainLower = domain.toLowerCase();
     
-    // Check for fake country-lookalike TLDs first
     for (const fakeTld of FAKE_COUNTRY_TLDS) {
         if (domainLower.endsWith(fakeTld)) {
             return {
@@ -1729,7 +1645,6 @@ function detectSuspiciousDomain(domain) {
         }
     }
     
-    // v3.7.0: Check for suspicious generic TLDs (.biz, .info, .shop, etc.)
     const suspiciousGenericTLDs = ['.biz', '.info', '.shop', '.club', '.top', '.xyz', '.buzz', '.icu'];
     const tld = '.' + domainLower.split('.').pop();
     if (suspiciousGenericTLDs.includes(tld)) {
@@ -1739,8 +1654,6 @@ function detectSuspiciousDomain(domain) {
         };
     }
     
-    // Get the registrable domain (the part someone can register, not subdomains)
-    // e.g., "mailcenter.usaa.com" -> "usaa", "secure-login.co.uk" -> "secure-login"
     const registrableName = getRegistrableDomainName(domainLower);
     
     if (registrableName.includes('-')) {
@@ -1772,7 +1685,6 @@ function detectSuspiciousDomain(domain) {
 
 /**
  * Extract the registrable domain name (without TLD) from a full domain
- * e.g., "mailcenter.usaa.com" -> "usaa", "secure-login.co.uk" -> "secure-login"
  */
 function getRegistrableDomainName(domain) {
     const compoundTlds = ['.co.uk', '.co.za', '.co.in', '.co.jp', '.co.kr', '.co.nz', 
@@ -1780,7 +1692,6 @@ function getRegistrableDomainName(domain) {
                          '.com.ng', '.com.pk', '.com.ph', '.com.tr', '.com.ua', '.com.ve', '.com.vn',
                          '.net.br', '.net.co', '.org.br', '.org.co', '.org.uk'];
     
-    // Check for compound TLDs first
     for (const tld of compoundTlds) {
         if (domain.endsWith(tld)) {
             const withoutTld = domain.slice(0, -tld.length);
@@ -1789,7 +1700,6 @@ function getRegistrableDomainName(domain) {
         }
     }
     
-    // Standard TLD - get the second-to-last part
     const parts = domain.split('.');
     if (parts.length >= 2) {
         return parts[parts.length - 2];
@@ -1969,7 +1879,6 @@ async function analyzeCurrentEmail() {
         const from = item.from;
         const subject = item.subject;
         
-        // v3.8.1: Count recipients for mass-distribution detection
         const toRecipients = Array.isArray(item.to) ? item.to : [];
         const ccRecipients = Array.isArray(item.cc) ? item.cc : [];
         const recipientCount = toRecipients.length + ccRecipients.length;
@@ -1988,7 +1897,6 @@ async function analyzeCurrentEmail() {
                                 replyTo = emailMatch[1].trim();
                             }
                         }
-                        // v3.8.0: Parse Sender header for "on behalf of" detection
                         const senderMatch = headers.match(/^Sender:\s*(.+)$/mi);
                         if (senderMatch) {
                             const senderEmailMatch = senderMatch[1].match(/<([^>]+)>/) || senderMatch[1].match(/([^\s,]+@[^\s,]+)/);
@@ -2045,7 +1953,6 @@ function processEmail(emailData) {
     // NEW v3.5.0 CHECKS (run first - highest priority)
     // ============================================
     
-    // Check for recipient self-spoofing
     const recipientSpoof = detectRecipientSpoofing(displayName, senderEmail);
     if (recipientSpoof) {
         warnings.push({
@@ -2058,7 +1965,6 @@ function processEmail(emailData) {
         });
     }
     
-    // Check for phishing urgency keywords
     const phishingUrgency = detectPhishingUrgency(emailData.body, emailData.subject);
     if (phishingUrgency) {
         warnings.push({
@@ -2072,7 +1978,6 @@ function processEmail(emailData) {
         });
     }
     
-    // Check for gibberish domain
     const gibberishDomain = detectGibberishDomain(senderEmail);
     if (gibberishDomain) {
         warnings.push({
@@ -2089,7 +1994,6 @@ function processEmail(emailData) {
     // EXISTING CHECKS
     // ============================================
     
-    // 1. Reply-To Mismatch
     if (replyTo && replyTo.toLowerCase() !== senderEmail) {
         const replyToDomain = replyTo.split('@')[1] || '';
         if (replyToDomain.toLowerCase() !== senderDomain) {
@@ -2104,7 +2008,6 @@ function processEmail(emailData) {
         }
     }
     
-    // v3.8.0: On-Behalf-Of / Sender Mismatch
     if (senderHeader) {
         const senderHeaderLower = senderHeader.toLowerCase();
         const senderHeaderDomain = senderHeaderLower.split('@')[1] || '';
@@ -2120,7 +2023,6 @@ function processEmail(emailData) {
         }
     }
     
-    // 2. Brand Impersonation
     const brandImpersonation = detectBrandImpersonation(emailData.subject, emailData.body, senderDomain);
     if (brandImpersonation) {
         warnings.push({
@@ -2135,12 +2037,9 @@ function processEmail(emailData) {
         });
     }
     
-    // 3. Organization Impersonation
-    // v3.8.0: Skip if brand impersonation already caught this brand (avoids duplicate warnings)
     if (!isTrustedDomain(senderDomain)) {
         const orgImpersonation = detectOrganizationImpersonation(displayName, senderDomain);
         if (orgImpersonation) {
-            // Only add if brand impersonation didn't already flag the same entity
             const brandAlreadyCaught = brandImpersonation && 
                 brandImpersonation.brandName.toLowerCase() === orgImpersonation.entityClaimed.toLowerCase();
             if (!brandAlreadyCaught) {
@@ -2157,7 +2056,6 @@ function processEmail(emailData) {
         }
     }
     
-    // 4. International Sender (formerly Deceptive TLD)
     const internationalSender = detectInternationalSender(senderDomain);
     if (internationalSender) {
         warnings.push({
@@ -2172,7 +2070,6 @@ function processEmail(emailData) {
         });
     }
     
-    // 5. Suspicious Domain
     const suspiciousDomain = detectSuspiciousDomain(senderDomain);
     if (suspiciousDomain) {
         warnings.push({
@@ -2183,7 +2080,6 @@ function processEmail(emailData) {
         });
     }
     
-    // 6. Display Name Suspicion
     if (!isKnownContact) {
         const displaySuspicion = detectSuspiciousDisplayName(displayName, senderDomain);
         if (displaySuspicion) {
@@ -2198,7 +2094,6 @@ function processEmail(emailData) {
         }
     }
     
-    // 7. Display Name Impersonation
     if (!isKnownContact) {
         const impersonation = detectDisplayNameImpersonation(displayName, senderDomain);
         if (impersonation) {
@@ -2213,7 +2108,6 @@ function processEmail(emailData) {
         }
     }
     
-    // 8. Homoglyphs
     const homoglyph = detectHomoglyphs(senderEmail);
     if (homoglyph) {
         warnings.push({
@@ -2226,7 +2120,6 @@ function processEmail(emailData) {
         });
     }
     
-    // 9. Lookalike Domain
     const lookalike = detectLookalikeDomain(senderDomain);
     if (lookalike) {
         warnings.push({
@@ -2239,7 +2132,6 @@ function processEmail(emailData) {
         });
     }
     
-    // 10. Wire Fraud Keywords
     const wireKeywords = detectWireFraudKeywords(content);
     if (wireKeywords.length > 0) {
         const keywordInfo = getKeywordExplanation(wireKeywords[0]);
@@ -2254,7 +2146,6 @@ function processEmail(emailData) {
         });
     }
     
-    // 11. Contact Lookalike
     if (!isKnownContact && knownContacts.size > 0) {
         const contactLookalike = detectContactLookalike(senderEmail);
         if (contactLookalike) {
@@ -2270,7 +2161,6 @@ function processEmail(emailData) {
         }
     }
     
-    // 12. Mass Recipients (v3.8.1)
     if (emailData.recipientCount >= 10) {
         warnings.push({
             type: 'mass-recipients',
@@ -2301,16 +2191,10 @@ function showError(message) {
     document.body.className = '';
 }
 
-/**
- * Helper to wrap domain in nowrap span
- */
 function wrapDomain(domain) {
     return `<span style="white-space: nowrap;">${domain}</span>`;
 }
 
-/**
- * Format domains list with proper styling
- */
 function formatDomainsList(domains) {
     return domains.map(d => wrapDomain(d)).join(', ');
 }
@@ -2333,12 +2217,12 @@ function displayResults(warnings) {
         const totalWarnings = criticalCount + mediumCount;
         document.body.classList.add('status-critical');
         statusBadge.className = 'status-badge danger';
-        statusIcon.textContent = '🚨';
+        statusIcon.textContent = '\uD83D\uDEA8';
         statusText.textContent = `${totalWarnings} Issue${totalWarnings > 1 ? 's' : ''} Found`;
     } else {
         document.body.classList.add('status-safe');
         statusBadge.className = 'status-badge safe';
-        statusIcon.textContent = '✅';
+        statusIcon.textContent = '\u2705';
         statusText.textContent = 'No Issues Detected';
     }
     
@@ -2348,7 +2232,6 @@ function displayResults(warnings) {
     const safeMessage = document.getElementById('safe-message');
     
     if (warnings.length > 0) {
-        // Sort warnings by priority (highest threat first)
         const WARNING_PRIORITY = {
             'replyto-mismatch': 1,
             'on-behalf-of': 2,
@@ -2408,7 +2291,6 @@ function displayResults(warnings) {
                     </div>
                 `;
             } else if (w.type === 'brand-impersonation') {
-                // v3.6.0: Three-row format with nowrap domains
                 emailHtml = `
                     <div class="warning-emails">
                         <div class="warning-email-row">
@@ -2426,7 +2308,6 @@ function displayResults(warnings) {
                     </div>
                 `;
             } else if (w.type === 'international-sender') {
-                // v3.6.0: Simplified international sender format - country on second line
                 emailHtml = `
                     <div class="warning-international-info">
                         <p>This sender's email address includes a country code: ${w.tld}<br>(${w.country})</p>
@@ -2435,7 +2316,6 @@ function displayResults(warnings) {
                     </div>
                 `;
             } else if (w.type === 'mass-recipients') {
-                // v3.8.1: Mass-distributed email warning
                 emailHtml = `
                     <div class="warning-international-info">
                         <p style="margin-top: 8px;">Be suspicious of any email requesting action or payment that was sent to a large group.</p>
