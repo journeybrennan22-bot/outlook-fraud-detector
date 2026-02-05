@@ -1333,6 +1333,11 @@ function formatEntityName(name) {
     ).join(' ');
 }
 
+function truncateEmail(email, maxLength = 32) {
+    if (!email || email.length <= maxLength) return email;
+    return email.substring(0, maxLength) + '...';
+}
+
 function levenshteinDistance(a, b) {
     if (a.length === 0) return b.length;
     if (b.length === 0) return a.length;
@@ -2282,7 +2287,7 @@ function displayResults(warnings) {
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">Actually from:</span>
-                            <span class="warning-email-value suspicious" style="white-space: nowrap;">${w.senderEmail}</span>
+                            <span class="warning-email-value suspicious">${truncateEmail(w.senderEmail)}</span>
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">Legitimate domains:</span>
@@ -2326,11 +2331,11 @@ function displayResults(warnings) {
                     <div class="warning-emails">
                         <div class="warning-email-row">
                             <span class="warning-email-label">This email claims to be from:</span>
-                            <span class="warning-email-value known" style="white-space: nowrap;">${w.matchedEmail}</span>
+                            <span class="warning-email-value known">${truncateEmail(w.matchedEmail)}</span>
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">But is actually from:</span>
-                            <span class="warning-email-value suspicious" style="white-space: nowrap;">${w.senderEmail}</span>
+                            <span class="warning-email-value suspicious">${truncateEmail(w.senderEmail)}</span>
                         </div>
                     </div>
                 `;
@@ -2339,11 +2344,11 @@ function displayResults(warnings) {
                     <div class="warning-emails">
                         <div class="warning-email-row">
                             <span class="warning-email-label">Display name shows:</span>
-                            <span class="warning-email-value suspicious">${w.matchedEmail}</span>
+                            <span class="warning-email-value suspicious">${truncateEmail(w.matchedEmail)}</span>
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">But actually from:</span>
-                            <span class="warning-email-value suspicious" style="white-space: nowrap;">${w.senderEmail}</span>
+                            <span class="warning-email-value suspicious">${truncateEmail(w.senderEmail)}</span>
                         </div>
                     </div>
                 `;
@@ -2353,11 +2358,11 @@ function displayResults(warnings) {
                     <div class="warning-emails">
                         <div class="warning-email-row">
                             <span class="warning-email-label">Sender:</span>
-                            <span class="warning-email-value suspicious" style="white-space: nowrap;">${w.senderEmail}</span>
+                            <span class="warning-email-value suspicious">${truncateEmail(w.senderEmail)}</span>
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">${matchLabel}:</span>
-                            <span class="warning-email-value ${w.type === 'gibberish-domain' ? 'suspicious' : 'known'}" style="white-space: nowrap;">${w.matchedEmail}</span>
+                            <span class="warning-email-value ${w.type === 'gibberish-domain' ? 'suspicious' : 'known'}">${truncateEmail(w.matchedEmail)}</span>
                         </div>
                         ${w.reason ? `<div class="warning-reason">${w.reason}</div>` : ''}
                     </div>
