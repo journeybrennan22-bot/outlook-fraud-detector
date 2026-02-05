@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 4.0.4 - Expanded suspicious TLDs list (added 23 high-abuse domains)
+// Version 4.0.5 - Tiered digit ratio scoring (>50% = +3, >30% = +2)
 
 // ============================================
 // CONFIGURATION
@@ -1240,14 +1240,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v4.0.4 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v4.0.5 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v4.0.4 initializing for Outlook...');
+        console.log('Email Fraud Detector v4.0.5 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v4.0.4 ready');
+        console.log('Email Fraud Detector v4.0.5 ready');
     }
 });
 
@@ -1534,10 +1534,14 @@ function detectGibberishDomain(email) {
     const reasons = [];
     
     // Check 1: High digit ratio in main domain part
+    // v4.0.5: Tiered scoring - very high (>50%) gets +3, high (>30%) gets +2
     if (mainPart.length > 3) {
         const digitCount = (mainPart.match(/\d/g) || []).length;
         const digitRatio = digitCount / mainPart.length;
-        if (digitRatio > 0.3) {
+        if (digitRatio > 0.5) {
+            suspicionScore += 3;
+            reasons.push('very high number ratio');
+        } else if (digitRatio > 0.3) {
             suspicionScore += 2;
             reasons.push('high number ratio');
         }
