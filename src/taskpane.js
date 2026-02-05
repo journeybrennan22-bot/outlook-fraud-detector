@@ -1333,9 +1333,8 @@ function formatEntityName(name) {
     ).join(' ');
 }
 
-function formatEmailForDisplay(email, maxLength = 35) {
+function formatEmailForDisplay(email) {
     if (!email || !email.includes('@')) return email;
-    if (email.length <= maxLength) return email;
     return email.replace('@', '@<br>');
 }
 
