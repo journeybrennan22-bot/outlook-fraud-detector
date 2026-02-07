@@ -78,9 +78,9 @@ const INTERNATIONAL_TLDS = [
 
 // Country code TLDs that are widely used for generic/commercial purposes
 const GENERIC_USE_CCTLDS = {
-    '.co': 'This sender uses a .co domain. While .co is technically the official domain for the country of Colombia, it is widely used by legitimate businesses worldwide. If you do not recognize this sender, proceed with caution.',
-    '.io': 'This sender uses a .io domain. While .io is technically the official domain for the British Indian Ocean Territory, it is widely used by technology companies worldwide. If you do not recognize this sender, proceed with caution.',
-    '.ai': 'This sender uses a .ai domain. While .ai is technically the official domain for the country of Anguilla, it is widely used by technology and AI companies worldwide. If you do not recognize this sender, proceed with caution.'
+    '.co': 'This sender uses a .co domain (Colombia\'s country code). While some legitimate businesses use .co, scammers also exploit it to create convincing lookalike domains. If you don\'t recognize this sender, verify before clicking any links.',
+    '.io': 'This sender uses a .io domain (British Indian Ocean Territory\'s country code). While some legitimate tech companies use .io, scammers also exploit it to create convincing lookalike domains. If you don\'t recognize this sender, verify before clicking any links.',
+    '.ai': 'This sender uses a .ai domain (Anguilla\'s country code). While some legitimate AI and tech companies use .ai, scammers also exploit it to create convincing lookalike domains. If you don\'t recognize this sender, verify before clicking any links.'
 };
 
 // Fake country-lookalike TLDs (commercial services mimicking real TLDs)
