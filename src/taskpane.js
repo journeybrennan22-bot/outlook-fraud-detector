@@ -46,6 +46,7 @@ const COUNTRY_CODE_TLDS = {
     '.uk': 'United Kingdom', '.us': 'United States', '.ve': 'Venezuela', '.vn': 'Vietnam',
     '.za': 'South Africa', '.ng': 'Nigeria', '.ke': 'Kenya',
     '.eg': 'Egypt', '.ae': 'United Arab Emirates',
+    '.io': 'British Indian Ocean Territory', '.ai': 'Anguilla',
     
     // Suspicious/commonly abused TLDs
     '.tk': 'Tokelau', '.ml': 'Mali', '.ga': 'Gabon',
@@ -72,8 +73,15 @@ const INTERNATIONAL_TLDS = [
     '.ke', '.kr', '.mx', '.my', '.ng', '.nl', '.no', '.nz',
     '.pe', '.ph', '.pk', '.pl', '.pt', '.ro', '.ru',
     '.sa', '.se', '.sg', '.th', '.tr', '.tw', '.ua', '.uk', '.us',
-    '.ve', '.vn', '.za'
+    '.ve', '.vn', '.za', '.io', '.ai'
 ];
+
+// Country code TLDs that are widely used for generic/commercial purposes
+const GENERIC_USE_CCTLDS = {
+    '.co': 'This sender uses a .co domain. While .co is technically the official domain for the country of Colombia, it is widely used by legitimate businesses worldwide. If you do not recognize this sender, proceed with caution.',
+    '.io': 'This sender uses a .io domain. While .io is technically the official domain for the British Indian Ocean Territory, it is widely used by technology companies worldwide. If you do not recognize this sender, proceed with caution.',
+    '.ai': 'This sender uses a .ai domain. While .ai is technically the official domain for the country of Anguilla, it is widely used by technology and AI companies worldwide. If you do not recognize this sender, proceed with caution.'
+};
 
 // Fake country-lookalike TLDs (commercial services mimicking real TLDs)
 // Built programmatically to cover all country codes + common gTLDs
@@ -1615,20 +1623,35 @@ function detectOrganizationImpersonation(displayName, senderDomain) {
 function detectInternationalSender(domain) {
     const domainLower = domain.toLowerCase();
     
+    // Check compound TLDs first (more specific)
     for (const [tld, country] of Object.entries(COUNTRY_CODE_TLDS)) {
         if (tld.includes('.') && tld.split('.').length > 2) {
             if (domainLower.endsWith(tld)) {
                 if (INTERNATIONAL_TLDS.some(t => domainLower.endsWith(t))) {
-                    return { tld, country };
+                    return { tld, country, genericUse: false };
                 }
             }
         }
     }
     
+    // Check for generic-use ccTLDs (.co, .io, .ai) - but NOT if it's a compound TLD
+    for (const [tld, message] of Object.entries(GENERIC_USE_CCTLDS)) {
+        if (domainLower.endsWith(tld)) {
+            // Make sure it's not a compound TLD (e.g., .com.co should not trigger .co)
+            const beforeTld = domainLower.slice(0, -tld.length);
+            const isCompound = beforeTld.endsWith('.com') || beforeTld.endsWith('.net') || beforeTld.endsWith('.org');
+            if (!isCompound) {
+                const country = COUNTRY_CODE_TLDS[tld] || 'Unknown';
+                return { tld, country, genericUse: true, genericMessage: message };
+            }
+        }
+    }
+    
+    // Check standard international TLDs
     for (const tld of INTERNATIONAL_TLDS) {
         if (domainLower.endsWith(tld)) {
             const country = COUNTRY_CODE_TLDS[tld] || 'Unknown';
-            return { tld, country };
+            return { tld, country, genericUse: false };
         }
     }
     
@@ -2071,7 +2094,9 @@ function processEmail(emailData) {
             senderEmail: senderEmail,
             senderDomain: senderDomain,
             country: internationalSender.country,
-            tld: internationalSender.tld
+            tld: internationalSender.tld,
+            genericUse: internationalSender.genericUse || false,
+            genericMessage: internationalSender.genericMessage || null
         });
     }
     
@@ -2313,13 +2338,21 @@ function displayResults(warnings) {
                     </div>
                 `;
             } else if (w.type === 'international-sender') {
-                emailHtml = `
-                    <div class="warning-international-info">
-                        <p>This sender's email address includes a country code: ${w.tld}<br>(${w.country})</p>
-                        <p style="margin-top: 8px;">Be careful, this could be a phishing attempt.</p>
-                        <p style="margin-top: 8px;">Most legitimate business emails use .com domains.</p>
-                    </div>
-                `;
+                if (w.genericUse && w.genericMessage) {
+                    emailHtml = `
+                        <div class="warning-international-info">
+                            <p>${w.genericMessage}</p>
+                        </div>
+                    `;
+                } else {
+                    emailHtml = `
+                        <div class="warning-international-info">
+                            <p>This sender's email address includes a country code: ${w.tld}<br>(${w.country})</p>
+                            <p style="margin-top: 8px;">Be careful, this could be a phishing attempt.</p>
+                            <p style="margin-top: 8px;">Most legitimate business emails use .com domains.</p>
+                        </div>
+                    `;
+                }
             } else if (w.type === 'mass-recipients') {
                 emailHtml = `
                     <div class="warning-international-info">
