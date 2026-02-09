@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 4.1.0 - Enhanced gibberish detection (vowel ratio + length checks)
+// Version 4.1.1 - Removed contact skip logic (all checks run on all emails)
 
 // ============================================
 // CONFIGURATION
@@ -25,7 +25,7 @@ const COUNTRY_CODE_TLDS = {
     '.co.in': 'India', '.co.jp': 'Japan', '.co.kr': 'South Korea',
     '.co.nz': 'New Zealand', '.net.br': 'Brazil', '.net.co': 'Colombia',
     '.org.br': 'Brazil', '.org.co': 'Colombia', '.org.uk': 'United Kingdom',
-    '.co.uk.com': 'United Kingdom', '.us.com': 'United States',
+    '.co.uk.com': 'United Kingdom', '.us.com': 'United States', '.co.us': 'United States',
     
     // Single ccTLDs
     '.ar': 'Argentina', '.au': 'Australia', '.at': 'Austria',
@@ -1156,14 +1156,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v4.1.0 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v4.1.1 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v4.1.0 initializing for Outlook...');
+        console.log('Email Fraud Detector v4.1.1 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v4.1.0 ready');
+        console.log('Email Fraud Detector v4.1.1 ready');
     }
 });
 
@@ -1973,6 +1973,8 @@ function processEmail(emailData) {
     const replyTo = emailData.replyTo;
     const senderHeader = emailData.senderHeader;
     
+    // v4.1.1: isKnownContact is now ONLY used for contact lookalike detection
+    // All other checks run on all emails regardless of contact status
     const isKnownContact = knownContacts.has(senderEmail);
     
     const warnings = [];
@@ -2110,32 +2112,30 @@ function processEmail(emailData) {
         });
     }
     
-    if (!isKnownContact) {
-        const displaySuspicion = detectSuspiciousDisplayName(displayName, senderDomain);
-        if (displaySuspicion) {
-            warnings.push({
-                type: 'display-name-suspicion',
-                severity: 'medium',
-                title: 'Suspicious Display Name',
-                description: displaySuspicion.reason,
-                senderEmail: senderEmail,
-                matchedEmail: displaySuspicion.pattern
-            });
-        }
+    // v4.1.1: Display name suspicion now runs on ALL emails (removed isKnownContact check)
+    const displaySuspicion = detectSuspiciousDisplayName(displayName, senderDomain);
+    if (displaySuspicion) {
+        warnings.push({
+            type: 'display-name-suspicion',
+            severity: 'medium',
+            title: 'Suspicious Display Name',
+            description: displaySuspicion.reason,
+            senderEmail: senderEmail,
+            matchedEmail: displaySuspicion.pattern
+        });
     }
     
-    if (!isKnownContact) {
-        const impersonation = detectDisplayNameImpersonation(displayName, senderDomain);
-        if (impersonation) {
-            warnings.push({
-                type: 'impersonation',
-                severity: 'critical',
-                title: 'Display Name Impersonation',
-                description: impersonation.reason,
-                senderEmail: senderEmail,
-                matchedEmail: impersonation.impersonatedDomain
-            });
-        }
+    // v4.1.1: Display name impersonation now runs on ALL emails (removed isKnownContact check)
+    const impersonation = detectDisplayNameImpersonation(displayName, senderDomain);
+    if (impersonation) {
+        warnings.push({
+            type: 'impersonation',
+            severity: 'critical',
+            title: 'Display Name Impersonation',
+            description: impersonation.reason,
+            senderEmail: senderEmail,
+            matchedEmail: impersonation.impersonatedDomain
+        });
     }
     
     const homoglyph = detectHomoglyphs(senderEmail);
@@ -2176,6 +2176,7 @@ function processEmail(emailData) {
         });
     }
     
+    // Contact lookalike still requires !isKnownContact (by design - catches imposters)
     if (!isKnownContact && knownContacts.size > 0) {
         const contactLookalike = detectContactLookalike(senderEmail);
         if (contactLookalike) {
