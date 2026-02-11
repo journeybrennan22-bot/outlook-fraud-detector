@@ -1,4 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
+// Version 4.1.3 - Added via routing detection for gibberish relay domains
 // Version 4.1.2 - Fixed SCE false positive (requires context words)
 
 // ============================================
@@ -1156,14 +1157,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v4.1.2 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v4.1.3 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v4.1.2 initializing for Outlook...');
+        console.log('Email Fraud Detector v4.1.3 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v4.1.2 ready');
+        console.log('Email Fraud Detector v4.1.3 ready');
     }
 });
 
@@ -1533,6 +1534,83 @@ function detectGibberishDomain(email) {
             domain: domain,
             reasons: reasons
         };
+    }
+    
+    return null;
+}
+
+/**
+ * v4.1.3: Detect suspicious via routing from headers
+ * Catches emails routed through gibberish/suspicious relay domains
+ */
+function detectViaRouting(headers, senderDomain) {
+    if (!headers) return null;
+    
+    // Look for Received headers to find relay domains
+    const receivedLines = headers.match(/Received:\s*from\s+[^\r\n]+/gi) || [];
+    
+    for (const line of receivedLines) {
+        // Extract domain from "Received: from domain.com" pattern
+        const domainMatch = line.match(/from\s+([a-zA-Z0-9][a-zA-Z0-9\.\-]*\.[a-zA-Z]{2,})/i);
+        if (!domainMatch) continue;
+        
+        const relayDomain = domainMatch[1].toLowerCase();
+        
+        // Skip if it's the sender's own domain
+        if (senderDomain && relayDomain.includes(senderDomain.split('.')[0])) continue;
+        
+        // Skip known legitimate mail services
+        const legitServices = ['google', 'gmail', 'googlemail', 'microsoft', 'outlook', 'office365', 
+                              'sendgrid', 'mailchimp', 'amazonses', 'mailgun', 'postmark', 'sparkpost',
+                              'mailjet', 'sendinblue', 'constantcontact', 'hubspot', 'salesforce',
+                              'zoho', 'yahoo', 'aol', 'icloud', 'apple', 'protonmail'];
+        if (legitServices.some(s => relayDomain.includes(s))) continue;
+        
+        // Get the main part of the relay domain (before first dot)
+        const domainParts = relayDomain.split('.');
+        const mainPart = domainParts[0];
+        
+        // Skip short domains - not enough signal
+        if (mainPart.length < 8) continue;
+        
+        // Check for gibberish indicators
+        let suspicionScore = 0;
+        
+        // High digit ratio
+        const digitCount = (mainPart.match(/\d/g) || []).length;
+        const digitRatio = digitCount / mainPart.length;
+        if (digitRatio > 0.3) suspicionScore += 2;
+        
+        // No vowels or very low vowel ratio
+        const letterCount = (mainPart.match(/[a-z]/gi) || []).length;
+        const vowelCount = (mainPart.match(/[aeiou]/gi) || []).length;
+        if (letterCount > 0) {
+            const vowelRatio = vowelCount / letterCount;
+            if (vowelRatio === 0) suspicionScore += 3;
+            else if (vowelRatio < 0.15) suspicionScore += 2;
+        }
+        
+        // Very long random-looking domain
+        if (mainPart.length > 15) suspicionScore += 1;
+        if (mainPart.length > 20) suspicionScore += 1;
+        
+        // Multiple subdomains with random patterns
+        if (domainParts.length >= 3) {
+            const randomSubdomains = domainParts.slice(0, -1).filter(part => {
+                const hasDigits = /\d/.test(part);
+                const vowels = (part.match(/[aeiou]/gi) || []).length;
+                return part.length > 6 && hasDigits && vowels <= 1;
+            });
+            if (randomSubdomains.length >= 2) suspicionScore += 2;
+        }
+        
+        // Need score of 3+ to flag
+        if (suspicionScore >= 3) {
+            return {
+                viaDomain: relayDomain,
+                senderDomain: senderDomain
+            };
+        }
     }
     
     return null;
@@ -1916,8 +1994,9 @@ async function analyzeCurrentEmail() {
                 item.getAllInternetHeadersAsync((headerResult) => {
                     let replyTo = null;
                     let senderHeader = null;
+                    let headers = null;
                     if (headerResult.status === Office.AsyncResultStatus.Succeeded) {
-                        const headers = headerResult.value;
+                        headers = headerResult.value;
                         const replyToMatch = headers.match(/^Reply-To:\s*(.+)$/mi);
                         if (replyToMatch) {
                             const emailMatch = replyToMatch[1].match(/<([^>]+)>/) || replyToMatch[1].match(/([^\s,]+@[^\s,]+)/);
@@ -1940,7 +2019,8 @@ async function analyzeCurrentEmail() {
                         body: bodyResult.value || '',
                         replyTo: replyTo,
                         senderHeader: senderHeader,
-                        recipientCount: recipientCount
+                        recipientCount: recipientCount,
+                        headers: headers
                     };
                     
                     processEmail(emailData);
@@ -1952,7 +2032,8 @@ async function analyzeCurrentEmail() {
                     body: bodyResult.value || '',
                     replyTo: null,
                     senderHeader: null,
-                    recipientCount: recipientCount
+                    recipientCount: recipientCount,
+                    headers: null
                 };
                 
                 processEmail(emailData);
@@ -2017,6 +2098,19 @@ function processEmail(emailData) {
             description: `This email comes from a domain that appears to be randomly generated (${gibberishDomain.reasons.join(', ')}). Legitimate companies use recognizable domain names.`,
             senderEmail: senderEmail,
             matchedEmail: gibberishDomain.domain
+        });
+    }
+    
+    // v4.1.3: Check for suspicious via routing (gibberish relay domains)
+    const viaRouting = detectViaRouting(emailData.headers, senderDomain);
+    if (viaRouting) {
+        warnings.push({
+            type: 'via-routing',
+            severity: 'critical',
+            title: 'Suspicious Routing Detected',
+            description: 'This email was routed through a suspicious relay server with a randomly-generated domain name. Legitimate businesses use recognizable mail servers.',
+            senderEmail: senderEmail,
+            viaDomain: viaRouting.viaDomain
         });
     }
 
@@ -2383,6 +2477,19 @@ function displayResults(warnings) {
                         <div class="warning-email-row">
                             <span class="warning-email-label">But actually from:</span>
                             <span class="warning-email-value suspicious">${formatEmailForDisplay(w.senderEmail)}</span>
+                        </div>
+                    </div>
+                `;
+            } else if (w.type === 'via-routing') {
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Sender:</span>
+                            <span class="warning-email-value">${formatEmailForDisplay(w.senderEmail)}</span>
+                        </div>
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Routed via:</span>
+                            <span class="warning-email-value suspicious">${wrapDomain(w.viaDomain)}</span>
                         </div>
                     </div>
                 `;
