@@ -2194,12 +2194,6 @@ function processEmail(emailData) {
     }
     
     // v4.1.4: Check for email authentication failures
-    console.log('HEADERS AVAILABLE:', emailData.headers ? 'YES (' + emailData.headers.length + ' chars)' : 'NULL');
-    console.log('AUTH-RESULTS FOUND:', emailData.headers ? (emailData.headers.match(/Authentication-Results:/i) ? 'YES' : 'NO') : 'N/A');
-    console.log('DMARC:', emailData.headers ? (emailData.headers.match(/dmarc\s*=\s*\w+/i) || ['not found'])[0] : 'N/A');
-    console.log('DKIM:', emailData.headers ? (emailData.headers.match(/dkim\s*=\s*\w+/i) || ['not found'])[0] : 'N/A');
-    console.log('COMPAUTH:', emailData.headers ? (emailData.headers.match(/compauth\s*=\s*\w+/i) || ['not found'])[0] : 'N/A');
-    console.log('CAT:SPOOF:', emailData.headers ? (/CAT:SPOOF/i.test(emailData.headers) ? 'YES' : 'NO') : 'N/A');
     const authFailure = detectAuthFailure(emailData.headers, senderDomain);
     if (authFailure) {
         warnings.push({
