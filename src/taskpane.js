@@ -1640,31 +1640,31 @@ function detectAuthFailure(headers, senderDomain) {
         // DMARC failure
         if (/dmarc\s*=\s*fail/i.test(authText)) {
             score += 2;
-            failures.push('DMARC failed');
+            failures.push('Sender identity not verified');
         }
         
         // DKIM none or fail
         if (/dkim\s*=\s*none/i.test(authText)) {
             score += 1;
-            failures.push('DKIM not signed');
+            failures.push('Email not digitally signed');
         } else if (/dkim\s*=\s*fail/i.test(authText)) {
             score += 2;
-            failures.push('DKIM failed');
+            failures.push('Digital signature failed');
         }
         
         // compauth failure (Microsoft composite authentication)
         if (/compauth\s*=\s*fail/i.test(authText)) {
             score += 2;
-            failures.push('Authentication check failed');
+            failures.push('Security check failed');
         }
         
         // SPF failure
         if (/spf\s*=\s*fail\b/i.test(authText)) {
             score += 2;
-            failures.push('SPF failed');
+            failures.push('Sender server not authorized');
         } else if (/spf\s*=\s*softfail/i.test(authText)) {
             score += 1;
-            failures.push('SPF soft fail');
+            failures.push('Sender server not fully authorized');
         }
     }
     
@@ -1672,7 +1672,7 @@ function detectAuthFailure(headers, senderDomain) {
     if (/CAT:SPOOF/i.test(headers)) {
         score += 3;
         if (!failures.includes('Flagged as spoofing')) {
-            failures.push('Flagged as spoofing');
+            failures.push('Flagged as a fake sender');
         }
     }
     
@@ -2200,7 +2200,7 @@ function processEmail(emailData) {
             type: 'auth-failure',
             severity: 'critical',
             title: 'Email Authentication Failed',
-            description: 'This email failed security checks that verify the sender\'s identity. The sender\'s domain could not be authenticated.',
+            description: 'This email failed security checks that verify the sender\'s identity. It may not be from who it claims. Verify the sender before clicking any links.',
             senderEmail: senderEmail,
             senderDomain: senderDomain,
             failures: authFailure.failures
@@ -2588,9 +2588,6 @@ function displayResults(warnings) {
                     </div>
                 `;
             } else if (w.type === 'auth-failure') {
-                const failureTags = w.failures.map(f => 
-                    `<span class="keyword-tag">${f}</span>`
-                ).join('');
                 emailHtml = `
                     <div class="warning-emails">
                         <div class="warning-email-row">
@@ -2598,12 +2595,8 @@ function displayResults(warnings) {
                             <span class="warning-email-value suspicious">${formatEmailForDisplay(w.senderEmail)}</span>
                         </div>
                     </div>
-                    <div class="warning-keywords-section">
-                        <div class="warning-keywords-label">Failed checks:</div>
-                        <div class="warning-keywords">${failureTags}</div>
-                    </div>
                     <div class="warning-advice">
-                        <strong>Why this matters:</strong> Email authentication (DMARC, DKIM, SPF) verifies that the sender is who they claim to be. When these checks fail, the email may be forged. Do not click links or provide information unless you can verify the sender through another channel.
+                        <strong>Why this matters:</strong> Every email goes through security checks to prove the sender is real. This email failed multiple checks. Legitimate senders almost always pass. Be cautious with any links, attachments, or requests in this email.
                     </div>
                 `;
             } else if (w.senderEmail && w.matchedEmail) {
