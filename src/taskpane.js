@@ -1,4 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
+// Version 4.1.4 - Added email authentication failure detection (DMARC/DKIM/compauth)
 // Version 4.1.3 - Added via routing detection for gibberish relay domains
 // Version 4.1.2 - Fixed SCE false positive (requires context words)
 
@@ -1157,14 +1158,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v4.1.3 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v4.1.4 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v4.1.3 initializing for Outlook...');
+        console.log('Email Fraud Detector v4.1.4 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v4.1.3 ready');
+        console.log('Email Fraud Detector v4.1.4 ready');
     }
 });
 
@@ -1611,6 +1612,84 @@ function detectViaRouting(headers, senderDomain) {
                 senderDomain: senderDomain
             };
         }
+    }
+    
+    return null;
+}
+
+/**
+ * v4.1.4: Detect email authentication failures from headers
+ * Checks DMARC, DKIM, compauth, SPF, and Microsoft's SPOOF categorization
+ * Uses scoring to require multiple failures before flagging
+ */
+function detectAuthFailure(headers, senderDomain) {
+    if (!headers) return null;
+    
+    // Skip trusted domains
+    if (senderDomain && CONFIG.trustedDomains.includes(senderDomain.toLowerCase())) return null;
+    
+    let score = 0;
+    const failures = [];
+    
+    // Parse Authentication-Results header
+    // This header can span multiple lines, so grab generously
+    const authMatch = headers.match(/Authentication-Results:[\s\S]*?(?=\nReceived:|\nReturn-Path:|\nFrom:|\nDate:|\nSubject:|\nMIME-Version:|\nContent-Type:|\nX-Priority:|\nX-SFDC|\nX-MS-Exchange)/i);
+    const authText = authMatch ? authMatch[0].toLowerCase() : '';
+    
+    if (authText) {
+        // DMARC failure
+        if (/dmarc\s*=\s*fail/i.test(authText)) {
+            score += 2;
+            failures.push('DMARC failed');
+        }
+        
+        // DKIM none or fail
+        if (/dkim\s*=\s*none/i.test(authText)) {
+            score += 1;
+            failures.push('DKIM not signed');
+        } else if (/dkim\s*=\s*fail/i.test(authText)) {
+            score += 2;
+            failures.push('DKIM failed');
+        }
+        
+        // compauth failure (Microsoft composite authentication)
+        if (/compauth\s*=\s*fail/i.test(authText)) {
+            score += 2;
+            failures.push('Authentication check failed');
+        }
+        
+        // SPF failure
+        if (/spf\s*=\s*fail\b/i.test(authText)) {
+            score += 2;
+            failures.push('SPF failed');
+        } else if (/spf\s*=\s*softfail/i.test(authText)) {
+            score += 1;
+            failures.push('SPF soft fail');
+        }
+    }
+    
+    // Check X-Forefront-Antispam-Report for SPOOF categorization
+    if (/CAT:SPOOF/i.test(headers)) {
+        score += 3;
+        if (!failures.includes('Flagged as spoofing')) {
+            failures.push('Flagged as spoofing');
+        }
+    }
+    
+    // Need score of 3+ to trigger
+    // Examples that trigger:
+    //   dmarc=fail(2) + compauth=fail(2) = 4 ✓
+    //   CAT:SPOOF(3) alone = 3 ✓
+    //   dmarc=fail(2) + dkim=none(1) = 3 ✓
+    // Examples that don't trigger:
+    //   dkim=none(1) alone = 1 ✗
+    //   spf=softfail(1) alone = 1 ✗
+    if (score >= 3 && failures.length > 0) {
+        return {
+            failures: failures,
+            score: score,
+            senderDomain: senderDomain
+        };
     }
     
     return null;
@@ -2113,6 +2192,20 @@ function processEmail(emailData) {
             viaDomain: viaRouting.viaDomain
         });
     }
+    
+    // v4.1.4: Check for email authentication failures
+    const authFailure = detectAuthFailure(emailData.headers, senderDomain);
+    if (authFailure) {
+        warnings.push({
+            type: 'auth-failure',
+            severity: 'critical',
+            title: 'Email Authentication Failed',
+            description: 'This email failed security checks that verify the sender\'s identity. The sender\'s domain could not be authenticated.',
+            senderEmail: senderEmail,
+            senderDomain: senderDomain,
+            failures: authFailure.failures
+        });
+    }
 
     // ============================================
     // EXISTING CHECKS
@@ -2367,14 +2460,15 @@ function displayResults(warnings) {
             'org-impersonation': 7,
             'suspicious-domain': 8,
             'via-routing': 9,
-            'gibberish-domain': 10,
-            'lookalike-domain': 11,
-            'homoglyph': 12,
-            'display-name-suspicion': 13,
-            'international-sender': 14,
-            'mass-recipients': 15,
-            'wire-fraud': 16,
-            'phishing-urgency': 17
+            'auth-failure': 10,
+            'gibberish-domain': 11,
+            'lookalike-domain': 12,
+            'homoglyph': 13,
+            'display-name-suspicion': 14,
+            'international-sender': 15,
+            'mass-recipients': 16,
+            'wire-fraud': 17,
+            'phishing-urgency': 18
         };
         warnings.sort((a, b) => (WARNING_PRIORITY[a.type] || 99) - (WARNING_PRIORITY[b.type] || 99));
         
@@ -2491,6 +2585,25 @@ function displayResults(warnings) {
                             <span class="warning-email-label">Routed via:</span>
                             <span class="warning-email-value suspicious">${wrapDomain(w.viaDomain)}</span>
                         </div>
+                    </div>
+                `;
+            } else if (w.type === 'auth-failure') {
+                const failureTags = w.failures.map(f => 
+                    `<span class="keyword-tag">${f}</span>`
+                ).join('');
+                emailHtml = `
+                    <div class="warning-emails">
+                        <div class="warning-email-row">
+                            <span class="warning-email-label">Sender:</span>
+                            <span class="warning-email-value suspicious">${formatEmailForDisplay(w.senderEmail)}</span>
+                        </div>
+                    </div>
+                    <div class="warning-keywords-section">
+                        <div class="warning-keywords-label">Failed checks:</div>
+                        <div class="warning-keywords">${failureTags}</div>
+                    </div>
+                    <div class="warning-advice">
+                        <strong>Why this matters:</strong> Email authentication (DMARC, DKIM, SPF) verifies that the sender is who they claim to be. When these checks fail, the email may be forged. Do not click links or provide information unless you can verify the sender through another channel.
                     </div>
                 `;
             } else if (w.senderEmail && w.matchedEmail) {
