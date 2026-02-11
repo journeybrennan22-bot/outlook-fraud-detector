@@ -1,5 +1,5 @@
 // Email Fraud Detector - Outlook Web Add-in
-// Version 4.1.1 - Removed contact skip logic (all checks run on all emails)
+// Version 4.1.2 - Fixed SCE false positive (requires context words)
 
 // ============================================
 // CONFIGURATION
@@ -147,6 +147,7 @@ const PHISHING_URGENCY_KEYWORDS = [
 
 // ============================================
 // BRAND IMPERSONATION DETECTION (CONTENT-BASED)
+// v4.1.2: Fixed SCE - requires context words to avoid false positives
 // ============================================
 const BRAND_CONTENT_DETECTION = {
     'docusign': {
@@ -606,7 +607,7 @@ const BRAND_CONTENT_DETECTION = {
         legitimateDomains: ['pge.com']
     },
     'sce': {
-        keywords: ['southern california edison', 'sce', 'edison account'],
+        keywords: ['southern california edison', 'sce bill', 'sce account', 'sce energy', 'sce power', 'edison account'],
         legitimateDomains: ['sce.com']
     },
     'con edison': {
@@ -689,6 +690,7 @@ const BRAND_CONTENT_DETECTION = {
 
 // ============================================
 // ORGANIZATION IMPERSONATION TARGETS
+// v4.1.2: Removed bare "sce" and "edison" to avoid false positives
 // ============================================
 const IMPERSONATION_TARGETS = {
     "social security": ["ssa.gov"],
@@ -997,8 +999,6 @@ const IMPERSONATION_TARGETS = {
     "pge": ["pge.com"],
     "pacific gas and electric": ["pge.com"],
     "southern california edison": ["sce.com"],
-    "sce": ["sce.com"],
-    "edison": ["sce.com"],
     "con edison": ["coned.com", "conedison.com"],
     "coned": ["coned.com", "conedison.com"],
     "duke energy": ["duke-energy.com"],
@@ -1156,14 +1156,14 @@ let contactsFetched = false;
 // INITIALIZATION
 // ============================================
 Office.onReady(async (info) => {
-    console.log('Email Fraud Detector v4.1.1 script loaded, host:', info.host);
+    console.log('Email Fraud Detector v4.1.2 script loaded, host:', info.host);
     if (info.host === Office.HostType.Outlook) {
-        console.log('Email Fraud Detector v4.1.1 initializing for Outlook...');
+        console.log('Email Fraud Detector v4.1.2 initializing for Outlook...');
         await initializeMsal();
         setupEventHandlers();
         analyzeCurrentEmail();
         setupAutoScan();
-        console.log('Email Fraud Detector v4.1.1 ready');
+        console.log('Email Fraud Detector v4.1.2 ready');
     }
 });
 
