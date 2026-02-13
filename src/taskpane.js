@@ -2588,7 +2588,7 @@ function displayResults(warnings) {
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">Routed via:</span>
-                            <span class="warning-email-value suspicious">${truncateText(w.viaDomain)}</span>
+                            <span class="warning-email-value suspicious">${w.viaDomain}</span>
                         </div>
                     </div>
                 `;
