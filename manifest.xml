@@ -9,7 +9,7 @@
   <Version>3.2.1</Version>
   <ProviderName>Email Fraud Alert</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Email Fraud Detector"/>
+  <DisplayName DefaultValue="Email Fraud Alert"/>
   <Description DefaultValue="Detects email fraud including lookalike domains, wire fraud keywords, organization impersonation, and other scam tactics."/>
   
   <IconUrl DefaultValue="https://journeybrennan22-bot.github.io/outlook-fraud-detector/assets/icon-64.png"/>
