@@ -2413,6 +2413,11 @@ function wrapDomain(domain) {
     return `<span style="white-space: nowrap;">${domain}</span>`;
 }
 
+function truncateText(text, maxLen = 38) {
+    if (!text || text.length <= maxLen) return text;
+    return text.substring(0, maxLen) + '\u2026';
+}
+
 function formatDomainsList(domains) {
     return domains.map(d => wrapDomain(d)).join(', ');
 }
@@ -2583,7 +2588,7 @@ function displayResults(warnings) {
                         </div>
                         <div class="warning-email-row">
                             <span class="warning-email-label">Routed via:</span>
-                            <span class="warning-email-value suspicious">${wrapDomain(w.viaDomain)}</span>
+                            <span class="warning-email-value suspicious">${truncateText(w.viaDomain)}</span>
                         </div>
                     </div>
                 `;
