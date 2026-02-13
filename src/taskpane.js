@@ -80,9 +80,9 @@ const INTERNATIONAL_TLDS = [
 
 // Country code TLDs that are widely used for generic/commercial purposes
 const GENERIC_USE_CCTLDS = {
-    '.co': 'This sender uses a .co domain (Colombia\'s country code). While some legitimate businesses use .co, scammers also exploit it to create convincing lookalike domains. If you don\'t recognize this sender, verify before clicking any links.',
-    '.io': 'This sender uses a .io domain (British Indian Ocean Territory\'s country code). While some legitimate tech companies use .io, scammers also exploit it to create convincing lookalike domains. If you don\'t recognize this sender, verify before clicking any links.',
-    '.ai': 'This sender uses a .ai domain (Anguilla\'s country code). While some legitimate AI and tech companies use .ai, scammers also exploit it to create convincing lookalike domains. If you don\'t recognize this sender, verify before clicking any links.'
+    '.co': 'This sender uses a .co domain (Colombia\'s country code). <strong>While some legitimate businesses use .co</strong>, scammers also exploit it to create convincing lookalike domains. If you don\'t recognize this sender, verify before clicking any links.',
+    '.io': 'This sender uses a .io domain (British Indian Ocean Territory\'s country code). <strong>While some legitimate tech companies use .io</strong>, scammers also exploit it to create convincing lookalike domains. If you don\'t recognize this sender, verify before clicking any links.',
+    '.ai': 'This sender uses a .ai domain (Anguilla\'s country code). <strong>While some legitimate AI and tech companies use .ai</strong>, scammers also exploit it to create convincing lookalike domains. If you don\'t recognize this sender, verify before clicking any links.'
 };
 
 // Fake country-lookalike TLDs (commercial services mimicking real TLDs)
